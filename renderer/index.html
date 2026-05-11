@@ -235,6 +235,16 @@ button, .ctrl, .pill-overlay, .node {
   z-index: 3;
 }
 
+/* THINKING · soft pulsing ring while Claude is responding */
+.node.thinking {
+  animation: thinking-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes thinking-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 var(--accent-soft); }
+  50%      { box-shadow: 0 0 0 8px var(--accent-soft); }
+}
+
 /* In min view, the pill IS the node — keep all its visual styling */
 
 .node .badge {
@@ -448,6 +458,7 @@ const state = {
   view: 'focused',
   theme: localStorage.getItem('toot-theme') || 'light',
   currentId: 'voice',
+  thinkingNodeId: null,
   branchCounter: 0,
 };
 
@@ -572,6 +583,7 @@ function addNodeEl(node, opts = {}) {
   const el = document.createElement('div');
   el.className = `node ${node.kind}`;
   if (node.id === state.currentId) el.classList.add('current');
+  if (node.id === state.thinkingNodeId) el.classList.add('thinking');
   el.style.left = node.x + 'px';
   el.style.top  = node.y + 'px';
   el.dataset.id = node.id;
@@ -668,14 +680,21 @@ function applyDaemonState(daemonState) {
   }
   // Detect new nodes that should magic-write
   const previousIds = new Set(tree.nodes.map(n => n.id));
+  const previousLabels = Object.fromEntries(tree.nodes.map(n => [n.id, n.label]));
   const newIds = new Set();
+  const relabeledIds = new Set();
   for (const n of daemonState.nodes) {
-    if (!previousIds.has(n.id)) newIds.add(n.id);
+    if (!previousIds.has(n.id)) {
+      newIds.add(n.id);
+    } else if (previousLabels[n.id] !== n.label) {
+      relabeledIds.add(n.id);
+    }
   }
 
   tree.nodes = daemonState.nodes.map(n => ({ ...n }));
   tree.edges = daemonState.edges.map(e => ({ ...e }));
   if (daemonState.currentId) state.currentId = daemonState.currentId;
+  state.thinkingNodeId = daemonState.thinkingNodeId || null;
 
   layoutTree();
 
@@ -684,9 +703,18 @@ function applyDaemonState(daemonState) {
   Object.assign(nodeById, Object.fromEntries(tree.nodes.map(n => [n.id, n])));
 
   renderEdges();
-  renderNodes({ magicIds: newIds });
+  // Magic-write new nodes AND relabeled ones (Claude's <train-of-thought> refinement)
+  const magicIds = new Set([...newIds, ...relabeledIds]);
+  renderNodes({ magicIds });
+  updateThinkingClass();
   updatePill();
   applyTransform();
+}
+
+function updateThinkingClass() {
+  document.querySelectorAll('.node').forEach(el => {
+    el.classList.toggle('thinking', el.dataset.id === state.thinkingNodeId);
+  });
 }
 
 // Top-down auto-layout for daemon-supplied nodes (which don't have x/y)

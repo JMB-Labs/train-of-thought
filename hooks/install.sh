@@ -51,4 +51,28 @@ node -e "
 
 chmod +x "$HOOK_DIR"/*.sh
 
+# --- Wire the <train-of-thought> labeling instruction into ~/CLAUDE.md ---
+GLOBAL_CLAUDE_MD="$HOME/CLAUDE.md"
+TAG_MARKER="<!-- toot-labeling-block -->"
+TAG_BLOCK=$(cat <<'MARKDOWN'
+<!-- toot-labeling-block -->
+## Train of Thought labeling
+
+The Train of Thought widget is installed on this system. At the start of EVERY response, on its own line, emit this tag:
+
+<train-of-thought>3-5 word label describing what you're working on</train-of-thought>
+
+Keep it short, verby, specific. Examples: "wire daemon to renderer", "fix POS UI bug", "rebuild auth flow". Don't be cute — be clear.
+<!-- /toot-labeling-block -->
+MARKDOWN
+)
+
+if [ -f "$GLOBAL_CLAUDE_MD" ] && grep -q "$TAG_MARKER" "$GLOBAL_CLAUDE_MD"; then
+  echo "[toot] CLAUDE.md labeling block already present, skipping."
+else
+  [ -f "$GLOBAL_CLAUDE_MD" ] || echo "" > "$GLOBAL_CLAUDE_MD"
+  printf "\n\n%s\n" "$TAG_BLOCK" >> "$GLOBAL_CLAUDE_MD"
+  echo "[toot] Appended labeling block to $GLOBAL_CLAUDE_MD"
+fi
+
 echo "Hooks installed. Restart Claude Code to activate."

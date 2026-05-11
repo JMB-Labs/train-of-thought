@@ -20,6 +20,7 @@ let state = {
   nodes: [],
   edges: [],
   currentId: null,
+  thinkingNodeId: null,  // node currently being worked on by Claude
   sessions: {}, // sessionId -> { rootId, lastNodeId, cwd }
 };
 
@@ -174,8 +175,18 @@ function handleEvent(event) {
     });
     session.lastNodeId = newId;
     state.currentId = newId;
+    state.thinkingNodeId = newId;  // Claude is now working on this thought
   } else if (event.type === 'stop') {
-    // For now: just record; no visual change
+    // Claude finished responding — clear thinking state
+    state.thinkingNodeId = null;
+  } else if (event.type === 'update-latest-label') {
+    // Stop hook extracted a <train-of-thought> tag — refine the label
+    const session = state.sessions[sessionId];
+    if (session && event.label) {
+      const node = state.nodes.find(n => n.id === session.lastNodeId);
+      if (node) node.label = event.label.trim().slice(0, 40);
+    }
+    state.thinkingNodeId = null;
   }
 
   save();
