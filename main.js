@@ -1,10 +1,47 @@
 const { app, BrowserWindow, screen, ipcMain } = require('electron');
-const { spawn } = require('child_process');
+const { spawn, exec } = require('child_process');
 const http = require('http');
 const path = require('path');
 
 let win;
 let daemon;
+let followTimer;
+let lastHostKey = '';
+
+// Apps to anchor the pill to (in priority order). Configurable later.
+const FOLLOW_APPS = ['Conductor', 'Claude', 'iTerm2', 'Terminal', 'Code'];
+
+function queryAppWindow(appName) {
+  return new Promise((resolve) => {
+    const script =
+      `tell application "System Events"\n` +
+      `  if not (exists (process "${appName}")) then return ""\n` +
+      `  tell process "${appName}"\n` +
+      `    if (count of windows) = 0 then return ""\n` +
+      `    set p to position of front window\n` +
+      `    set s to size of front window\n` +
+      `    return (item 1 of p as integer) & "," & (item 2 of p as integer) & "," & (item 1 of s as integer) & "," & (item 2 of s as integer)\n` +
+      `  end tell\n` +
+      `end tell`;
+    exec(`osascript -e ${JSON.stringify(script)}`, { timeout: 800 }, (err, stdout) => {
+      if (err) return resolve(null);
+      const out = (stdout || '').toString().trim();
+      if (!out) return resolve(null);
+      const parts = out.split(',').map(s => parseInt(s.trim(), 10));
+      if (parts.some(isNaN)) return resolve(null);
+      const [x, y, w, h] = parts;
+      resolve({ x, y, width: w, height: h });
+    });
+  });
+}
+
+async function findHostWindow() {
+  for (const appName of FOLLOW_APPS) {
+    const bounds = await queryAppWindow(appName);
+    if (bounds && bounds.width > 200 && bounds.height > 200) return bounds;
+  }
+  return null;
+}
 
 function pingDaemon() {
   return new Promise((resolve) => {
@@ -33,26 +70,33 @@ const SIZE_FULL = { w: 800, h: 560 };
 const SIZE_PILL = { w: 240, h: 80 };
 const MARGIN_RIGHT = 24;
 const MARGIN_TOP = 70;
+const HOST_ANCHOR_OFFSET = { right: 16, top: 50 };
 
-function fullBounds() {
+let cachedHost = null;
+
+async function refreshHost() {
+  cachedHost = await findHostWindow();
+  return cachedHost;
+}
+
+function anchorBoundsFor(size) {
+  // If we have a host window, anchor top-right inside it; else fall back to screen.
+  if (cachedHost) {
+    const x = cachedHost.x + cachedHost.width - size.w - HOST_ANCHOR_OFFSET.right;
+    const y = cachedHost.y + HOST_ANCHOR_OFFSET.top;
+    return { x, y, width: size.w, height: size.h };
+  }
   const { width: sw } = screen.getPrimaryDisplay().workAreaSize;
   return {
-    x: sw - SIZE_FULL.w - MARGIN_RIGHT,
+    x: sw - size.w - MARGIN_RIGHT,
     y: MARGIN_TOP,
-    width: SIZE_FULL.w,
-    height: SIZE_FULL.h,
+    width: size.w,
+    height: size.h,
   };
 }
 
-function pillBounds() {
-  const { width: sw } = screen.getPrimaryDisplay().workAreaSize;
-  return {
-    x: sw - SIZE_PILL.w - MARGIN_RIGHT,
-    y: MARGIN_TOP,
-    width: SIZE_PILL.w,
-    height: SIZE_PILL.h,
-  };
-}
+function fullBounds() { return anchorBoundsFor(SIZE_FULL); }
+function pillBounds() { return anchorBoundsFor(SIZE_PILL); }
 
 function createWindow() {
   const b = fullBounds();
@@ -83,8 +127,30 @@ function createWindow() {
 
 app.whenReady().then(async () => {
   await startDaemon();
+  await refreshHost();
   createWindow();
+  startFollowingHost();
 });
+
+// Poll the host (Claude / Conductor / Terminal) window position and reposition the pill to track it.
+function startFollowingHost() {
+  if (followTimer) clearInterval(followTimer);
+  followTimer = setInterval(async () => {
+    if (!win || win.isDestroyed()) return;
+    const host = await findHostWindow();
+    if (!host) return;
+    const key = `${host.x},${host.y},${host.width},${host.height}`;
+    if (key === lastHostKey) return;
+    lastHostKey = key;
+    cachedHost = host;
+    // Reposition based on current view (pill vs full). Use width as the discriminator.
+    const cur = win.getBounds();
+    const isMin = Math.abs(cur.width - SIZE_PILL.w) < 30;
+    const target = isMin ? pillBounds() : fullBounds();
+    // Smooth-tween into the new position
+    smoothResize(target, 300);
+  }, 1000);
+}
 
 app.on('before-quit', () => {
   if (daemon && !daemon.killed) daemon.kill();
