@@ -407,6 +407,61 @@ button, .ctrl, .pill-overlay, .node {
   box-shadow: 0 0 0 1px var(--accent), 0 0 10px 2px var(--accent-glow);
 }
 
+/* ============================================================
+   CONTEXT MENU
+   ============================================================ */
+.context-menu {
+  position: absolute;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 4px 0;
+  min-width: 130px;
+  z-index: 100;
+  display: none;
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+}
+
+.context-menu.visible { display: block; }
+
+.ctx-item {
+  padding: 7px 14px;
+  cursor: pointer;
+  color: var(--text);
+  -webkit-app-region: no-drag;
+}
+
+.ctx-item:hover { background: rgba(127, 127, 127, 0.1); }
+.ctx-item.danger { color: #E15554; }
+.ctx-item.danger:hover { background: rgba(225, 85, 84, 0.12); }
+
+/* ============================================================
+   FILTER INDICATOR (per-project mode)
+   ============================================================ */
+.filter-chip {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  font-family: 'Inter', sans-serif;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--accent);
+  background: var(--accent-soft);
+  padding: 4px 10px;
+  border-radius: 100px;
+  border: 1px solid var(--accent);
+  display: none;
+  z-index: 12;
+  pointer-events: none;
+}
+
+#app[data-filter-on] .filter-chip { display: block; }
+#app[data-view="minimized"] .filter-chip { display: none !important; }
+
 </style>
 </head>
 <body>
@@ -447,6 +502,14 @@ button, .ctrl, .pill-overlay, .node {
       <span class="item"><span class="swatch dashed"></span>sidetrack</span>
       <span class="item"><span class="glow"></span>current</span>
     </div>
+
+    <div class="filter-chip" id="filter-chip">filtered</div>
+  </div>
+
+  <div class="context-menu" id="ctx-menu">
+    <div class="ctx-item" data-action="rename">Rename</div>
+    <div class="ctx-item" data-action="delete-children">Cut children</div>
+    <div class="ctx-item danger" data-action="delete">Delete</div>
   </div>
 </div>
 
@@ -460,6 +523,7 @@ const state = {
   currentId: 'voice',
   thinkingNodeId: null,
   branchCounter: 0,
+  projectFilter: null,  // when set, show only nodes whose cwd matches
 };
 
 // Window dimensions (must match main.js)
@@ -568,10 +632,10 @@ function renderNodes(opts = {}) {
   const magicIds = opts.magicIds || new Set();
   const container = document.getElementById('nodes');
   container.innerHTML = '';
-  tree.nodes.forEach((node, i) => {
+  const visible = getVisibleTree();
+  visible.nodes.forEach((node, i) => {
     const el = addNodeEl(node, { delay: 80 + i * 50, scaleIn: true });
     if (magicIds.has(node.id)) {
-      // Magic-write the label for newly-arrived nodes
       const labelSpan = el.querySelector('.node-now');
       if (labelSpan) setTimeout(() => magicWrite(labelSpan, node.label), 400);
     }
@@ -594,6 +658,13 @@ function addNodeEl(node, opts = {}) {
     e.stopPropagation();
     if (node.kind === 'session') return;
     focusNode(node.id);
+  });
+
+  el.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (node.kind === 'session') return;
+    showContextMenu(e.clientX, e.clientY, node.id);
   });
 
   if (opts.scaleIn) {
@@ -773,7 +844,8 @@ function renderEdges() {
   const svg = document.getElementById('edges');
   svg.innerHTML = '';
   svg.setAttribute('viewBox', `0 0 ${TARGET_W} ${TARGET_H}`);
-  tree.edges.forEach((edge, i) => addEdgeEl(edge, { delay: 60 + i * 60 }));
+  const visible = getVisibleTree();
+  visible.edges.forEach((edge, i) => addEdgeEl(edge, { delay: 60 + i * 60 }));
 }
 
 function addEdgeEl(edge, opts = {}) {
@@ -942,7 +1014,120 @@ function init() {
     else                document.getElementById('app').classList.remove('show-controls');
   });
 
+  // Context menu wiring
+  document.querySelectorAll('.ctx-item').forEach(item => {
+    item.addEventListener('click', (e) => {
+      e.stopPropagation();
+      handleCtxAction(item.dataset.action);
+      hideContextMenu();
+    });
+  });
+  document.addEventListener('click', hideContextMenu);
+  document.addEventListener('scroll', hideContextMenu, true);
+  window.addEventListener('blur', hideContextMenu);
+
+  // F to toggle per-project filter
+  document.addEventListener('keydown', (e) => {
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    if (e.key === 'f' || e.key === 'F') toggleProjectFilter();
+  });
+
   connectDaemon();
+}
+
+// ============================================================
+// CONTEXT MENU (right-click on nodes)
+// ============================================================
+let ctxTargetId = null;
+
+function showContextMenu(x, y, nodeId) {
+  ctxTargetId = nodeId;
+  const menu = document.getElementById('ctx-menu');
+  menu.style.left = x + 'px';
+  menu.style.top  = y + 'px';
+  menu.classList.add('visible');
+}
+
+function hideContextMenu() {
+  document.getElementById('ctx-menu').classList.remove('visible');
+}
+
+function handleCtxAction(action) {
+  if (!ctxTargetId) return;
+  const node = nodeById[ctxTargetId];
+  if (!node) return;
+  if (action === 'rename') {
+    const next = prompt('Rename:', node.label);
+    if (next && next.trim()) {
+      sendDaemon({ type: 'rename-node', id: node.id, label: next.trim() });
+    }
+  } else if (action === 'delete') {
+    if (confirm(`Delete "${node.label}" and all its children?`)) {
+      sendDaemon({ type: 'delete-node', id: node.id });
+    }
+  } else if (action === 'delete-children') {
+    // Find children of this node via edges and delete each
+    const children = tree.edges.filter(e => e.from === node.id).map(e => e.to);
+    if (children.length === 0) { alert('No children to cut.'); return; }
+    if (confirm(`Cut ${children.length} child thought(s) of "${node.label}"?`)) {
+      for (const cid of children) sendDaemon({ type: 'delete-node', id: cid });
+    }
+  }
+}
+
+function sendDaemon(msg) {
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify(msg));
+  }
+}
+
+// ============================================================
+// PER-PROJECT FILTER
+// ============================================================
+function toggleProjectFilter() {
+  if (state.projectFilter) {
+    state.projectFilter = null;
+  } else {
+    const current = nodeById[state.currentId];
+    state.projectFilter = current?.cwd || null;
+    if (!state.projectFilter) return;
+  }
+  const app = document.getElementById('app');
+  if (state.projectFilter) {
+    app.dataset.filterOn = '1';
+    const chip = document.getElementById('filter-chip');
+    if (chip) chip.textContent = state.projectFilter.split('/').pop();
+  } else {
+    delete app.dataset.filterOn;
+  }
+  layoutTree();
+  renderEdges();
+  renderNodes();
+  applyTransform();
+}
+
+// Filter helper — visible nodes/edges respect state.projectFilter
+function getVisibleTree() {
+  if (!state.projectFilter) return tree;
+  const matchIds = new Set();
+  for (const n of tree.nodes) {
+    if (n.cwd === state.projectFilter || n.kind === 'session') matchIds.add(n.id);
+  }
+  // Pull in ancestors so the tree connects
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const e of tree.edges) {
+      if (matchIds.has(e.to) && !matchIds.has(e.from)) {
+        matchIds.add(e.from);
+        changed = true;
+      }
+    }
+  }
+  return {
+    nodes: tree.nodes.filter(n => matchIds.has(n.id)),
+    edges: tree.edges.filter(e => matchIds.has(e.from) && matchIds.has(e.to)),
+  };
 }
 
 if (document.readyState === 'loading') {
