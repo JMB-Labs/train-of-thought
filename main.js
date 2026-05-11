@@ -8,8 +8,8 @@ let daemon;
 let followTimer;
 let lastHostKey = '';
 
-// Apps to anchor the pill to (in priority order). Configurable later.
-const FOLLOW_APPS = ['Conductor', 'Claude', 'iTerm2', 'Terminal', 'Code'];
+// Apps to anchor the pill to (in priority order). Claude desktop app first.
+const FOLLOW_APPS = ['Claude', 'Conductor', 'iTerm2', 'Terminal', 'Code'];
 
 function queryAppWindow(appName) {
   return new Promise((resolve) => {
@@ -70,7 +70,7 @@ const SIZE_FULL = { w: 800, h: 560 };
 const SIZE_PILL = { w: 240, h: 80 };
 const MARGIN_RIGHT = 24;
 const MARGIN_TOP = 70;
-const HOST_ANCHOR_OFFSET = { right: 16, top: 50 };
+const HOST_ANCHOR_OFFSET = { right: 18, top: 86 };
 
 let cachedHost = null;
 
@@ -125,7 +125,16 @@ function createWindow() {
   win.setAlwaysOnTop(true, 'floating');
 }
 
+// Trigger macOS Accessibility prompt for Electron if not already granted.
+// First osascript call against System Events will pop the dialog.
+function triggerAccessibilityPrompt() {
+  exec(`osascript -e 'tell application "System Events" to return name of first process'`, { timeout: 800 }, (err) => {
+    if (err) console.log('[toot] Accessibility permission needed for host-window tracking. System Settings → Privacy & Security → Accessibility → add Electron.');
+  });
+}
+
 app.whenReady().then(async () => {
+  triggerAccessibilityPrompt();
   await startDaemon();
   await refreshHost();
   createWindow();
