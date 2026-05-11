@@ -1,0 +1,1105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Train of Thought · Preview</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,500;0,8..60,600;1,8..60,400&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #FAF8F4;
+  --bg-card: #FFFFFF;
+  --text: #1F1E1B;
+  --text-2: #5C544A;
+  --text-3: #9C958A;
+  --text-4: #C9C4BB;
+  --accent: #DA7756;
+  --accent-soft: #F5E5DC;
+  --border: #E8E4DC;
+  --line: #D4CFC4;
+  --sidetrack: #B5826B;
+  --done: #94A98B;
+  --paused: #B8B0A4;
+  --shadow-sm: 0 1px 3px rgba(31, 30, 27, 0.04), 0 1px 2px rgba(31, 30, 27, 0.03);
+  --shadow: 0 2px 12px rgba(31, 30, 27, 0.06), 0 8px 32px rgba(31, 30, 27, 0.04);
+  --shadow-lg: 0 4px 20px rgba(31, 30, 27, 0.07), 0 20px 64px rgba(31, 30, 27, 0.06);
+  --easing: cubic-bezier(0.16, 1, 0.3, 1);
+  --spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  font-family: 'Source Serif 4', Georgia, serif;
+  background: var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: "kern" 1, "liga" 1, "calt" 1;
+  overflow-x: hidden;
+}
+
+body {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background-image:
+    radial-gradient(circle at 15% 10%, rgba(218, 119, 86, 0.025) 0%, transparent 40%),
+    radial-gradient(circle at 85% 90%, rgba(92, 84, 74, 0.025) 0%, transparent 40%);
+}
+
+/* HEADER */
+header.app-header {
+  padding: 28px 48px 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+}
+
+.brand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.brand h1 {
+  font-family: 'Source Serif 4', serif;
+  font-weight: 400;
+  font-size: 30px;
+  letter-spacing: -0.015em;
+}
+
+.brand .tagline {
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-3);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.scene-nav {
+  display: flex;
+  gap: 2px;
+  background: var(--bg-card);
+  padding: 4px;
+  border-radius: 100px;
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+}
+
+.scene-nav button {
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 8px 18px;
+  border: none;
+  background: transparent;
+  color: var(--text-2);
+  border-radius: 100px;
+  cursor: pointer;
+  transition: all 0.3s var(--easing);
+}
+
+.scene-nav button:hover {
+  color: var(--text);
+  background: rgba(31, 30, 27, 0.03);
+}
+
+.scene-nav button.active {
+  background: var(--text);
+  color: var(--bg);
+}
+
+.scene-nav button.active:hover {
+  background: var(--text);
+  color: var(--bg);
+}
+
+/* STAGE */
+main.stage {
+  flex: 1;
+  position: relative;
+  margin: 24px 48px 28px;
+  border-radius: 24px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+  height: calc(100vh - 200px);
+  min-height: 580px;
+}
+
+.scene {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.5s var(--easing);
+}
+
+.scene.active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.preview-caption {
+  position: absolute;
+  top: 22px;
+  left: 28px;
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-3);
+  letter-spacing: 0.04em;
+  z-index: 10;
+}
+
+/* ============================================================ */
+/* SCENE 1: MINIMIZED                                            */
+/* ============================================================ */
+#scene-minimized {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+}
+
+.desktop-mock {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  max-width: 880px;
+  max-height: 520px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #1F1E1B 0%, #2A2825 100%);
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.25), 0 4px 16px rgba(0,0,0,0.12);
+}
+
+.desktop-mock .titlebar {
+  height: 28px;
+  background: rgba(0,0,0,0.25);
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
+}
+
+.desktop-mock .dots { display: flex; gap: 6px; }
+.desktop-mock .dot { width: 11px; height: 11px; border-radius: 50%; }
+.desktop-mock .dot:nth-child(1) { background: #FF5F57; }
+.desktop-mock .dot:nth-child(2) { background: #FEBC2E; }
+.desktop-mock .dot:nth-child(3) { background: #28C840; }
+
+.desktop-mock .titlebar-label {
+  flex: 1;
+  text-align: center;
+  font-family: ui-monospace, monospace;
+  font-size: 11px;
+  color: rgba(255,255,255,0.4);
+}
+
+.fake-terminal {
+  padding: 18px 22px;
+  font-family: ui-monospace, 'SF Mono', monospace;
+  font-size: 11.5px;
+  color: #9B958E;
+  line-height: 1.65;
+  height: calc(100% - 28px);
+  overflow: hidden;
+}
+
+.fake-terminal .line {
+  opacity: 0;
+  animation: typeIn 0.35s ease-out forwards;
+  white-space: pre;
+}
+
+.fake-terminal .accent { color: #DA9D7C; }
+.fake-terminal .prompt { color: #B8B0A4; }
+.fake-terminal .user { color: #E0DAD0; }
+.fake-terminal .tool { color: #94A98B; }
+
+@keyframes typeIn {
+  to { opacity: 1; }
+}
+
+.minimized-widget {
+  position: absolute;
+  bottom: 22px;
+  right: 22px;
+  background: var(--bg-card);
+  border-radius: 100px;
+  padding: 10px 14px 10px 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.35), 0 2px 8px rgba(0,0,0,0.2);
+  animation: floatIn 0.7s var(--easing) 0.3s both;
+  min-width: 260px;
+  cursor: pointer;
+  transition: transform 0.3s var(--easing), box-shadow 0.3s var(--easing);
+  user-select: none;
+}
+
+.minimized-widget:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 16px 48px rgba(0,0,0,0.38), 0 4px 12px rgba(0,0,0,0.22);
+}
+
+.pulse-dot {
+  width: 9px; height: 9px;
+  border-radius: 50%;
+  background: var(--accent);
+  flex-shrink: 0;
+  position: relative;
+}
+
+.pulse-dot::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: pulse 2.2s ease-out infinite;
+}
+
+@keyframes pulse {
+  0% { transform: scale(1); opacity: 0.7; }
+  100% { transform: scale(3); opacity: 0; }
+}
+
+@keyframes floatIn {
+  from { transform: translateY(16px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.minimized-widget .text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.minimized-widget .parent {
+  font-family: 'Inter', sans-serif;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+
+.minimized-widget .now {
+  font-family: 'Source Serif 4', serif;
+  font-size: 14px;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  letter-spacing: -0.005em;
+}
+
+.minimized-widget .chevron {
+  font-family: 'Inter', sans-serif;
+  color: var(--text-3);
+  font-size: 16px;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+/* ============================================================ */
+/* SCENE 2: FOCUSED                                              */
+/* ============================================================ */
+#scene-focused {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 40px;
+}
+
+.focused-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  max-width: 680px;
+  position: relative;
+}
+
+.focused-parent-meta {
+  font-family: 'Inter', sans-serif;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  margin-bottom: 8px;
+}
+
+.focused-parent-label {
+  font-family: 'Source Serif 4', serif;
+  font-style: italic;
+  font-size: 17px;
+  color: var(--text-2);
+  margin-bottom: 16px;
+  opacity: 0.85;
+  cursor: pointer;
+  transition: color 0.2s var(--easing);
+}
+
+.focused-parent-label:hover { color: var(--text); }
+
+.focused-stem {
+  width: 1.5px;
+  height: 32px;
+  background: linear-gradient(to bottom, var(--line), var(--accent));
+  margin-bottom: -1px;
+}
+
+.focused-current-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 32px 44px 28px;
+  box-shadow: var(--shadow);
+  position: relative;
+  min-width: 480px;
+  text-align: center;
+}
+
+.focused-current-card::before {
+  content: '';
+  position: absolute;
+  top: -6px; left: -6px; right: -6px; bottom: -6px;
+  border: 1px solid var(--accent);
+  border-radius: 22px;
+  opacity: 0.18;
+  animation: breathe 4s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes breathe {
+  0%, 100% { opacity: 0.18; transform: scale(1); }
+  50% { opacity: 0.06; transform: scale(1.018); }
+}
+
+.focused-current-card .now-label {
+  font-family: 'Inter', sans-serif;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 10px;
+}
+
+.focused-current-card .now-text {
+  font-family: 'Source Serif 4', serif;
+  font-size: 30px;
+  color: var(--text);
+  letter-spacing: -0.015em;
+  line-height: 1.25;
+  font-weight: 400;
+  min-height: 40px;
+}
+
+.cursor {
+  display: inline-block;
+  width: 2px;
+  height: 0.9em;
+  background: var(--accent);
+  margin-left: 3px;
+  vertical-align: -2px;
+  animation: blink 1.05s steps(2) infinite;
+}
+
+@keyframes blink {
+  to { opacity: 0; }
+}
+
+.focused-meta {
+  display: flex;
+  gap: 10px;
+  margin-top: 16px;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  color: var(--text-3);
+  font-weight: 500;
+}
+
+.focused-meta .pill {
+  padding: 3px 11px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-radius: 100px;
+  font-weight: 600;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.focused-siblings {
+  display: flex;
+  gap: 10px;
+  margin-top: 28px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.focused-sibling {
+  font-family: 'Source Serif 4', serif;
+  font-size: 13px;
+  color: var(--text-2);
+  padding: 7px 14px;
+  background: rgba(31, 30, 27, 0.025);
+  border: 1px solid transparent;
+  border-radius: 100px;
+  cursor: pointer;
+  transition: all 0.2s var(--easing);
+}
+
+.focused-sibling:hover {
+  background: var(--bg-card);
+  border-color: var(--border);
+  box-shadow: var(--shadow-sm);
+}
+
+.focused-sibling .status-dot {
+  display: inline-block;
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  margin-right: 7px;
+  vertical-align: middle;
+  background: var(--paused);
+}
+
+.focused-sibling.done .status-dot { background: var(--done); }
+
+/* ============================================================ */
+/* SCENE 3: FULL TREE                                            */
+/* ============================================================ */
+#scene-tree {
+  display: flex;
+  padding: 60px 50px 40px;
+}
+
+.tree-container {
+  flex: 1;
+  position: relative;
+}
+
+.tree-svg {
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.tree-node {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 100px;
+  padding: 8px 16px;
+  font-family: 'Source Serif 4', serif;
+  font-size: 13px;
+  color: var(--text);
+  white-space: nowrap;
+  box-shadow: var(--shadow-sm);
+  transition: all 0.25s var(--easing);
+  cursor: pointer;
+  z-index: 2;
+  letter-spacing: -0.005em;
+}
+
+.tree-node:hover {
+  transform: translate(-50%, calc(-50% - 2px));
+  box-shadow: var(--shadow);
+  border-color: var(--text-3);
+}
+
+.tree-node.session {
+  background: var(--text);
+  color: var(--bg);
+  border-color: var(--text);
+  font-family: 'Inter', sans-serif;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 6px 13px;
+}
+
+.tree-node.project {
+  font-weight: 500;
+  padding: 10px 18px;
+  font-size: 14px;
+  border-color: var(--text-2);
+  border-width: 1.5px;
+}
+
+.tree-node.sidetrack {
+  border-color: var(--sidetrack);
+  background: rgba(181, 130, 107, 0.06);
+  color: var(--sidetrack);
+  font-style: italic;
+}
+
+.tree-node.current {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 500;
+  box-shadow: 0 0 0 6px rgba(218, 119, 86, 0.10);
+  animation: nodepulse 3s ease-in-out infinite;
+}
+
+@keyframes nodepulse {
+  0%, 100% { box-shadow: 0 0 0 6px rgba(218, 119, 86, 0.10); }
+  50%      { box-shadow: 0 0 0 12px rgba(218, 119, 86, 0.04); }
+}
+
+.tree-node .status-dot {
+  display: inline-block;
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  margin-right: 7px;
+  vertical-align: middle;
+  background: var(--paused);
+}
+
+.tree-node.done { color: var(--text-2); }
+.tree-node.done .status-dot { background: var(--done); }
+
+.tree-node .badge {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 7px;
+  font-family: 'Inter', sans-serif;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  background: rgba(181, 130, 107, 0.18);
+  color: var(--sidetrack);
+  border-radius: 100px;
+  vertical-align: 1px;
+}
+
+.tree-legend {
+  position: absolute;
+  bottom: 28px;
+  left: 32px;
+  display: flex;
+  gap: 16px;
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  color: var(--text-3);
+  align-items: center;
+}
+
+.tree-legend .item { display: flex; align-items: center; gap: 6px; }
+.tree-legend .swatch {
+  width: 16px; height: 2px;
+  background: var(--line);
+  border-radius: 2px;
+}
+.tree-legend .swatch.dashed {
+  background: transparent;
+  border-top: 1.5px dashed var(--sidetrack);
+  height: 0;
+}
+
+/* ============================================================ */
+/* SCENE 4: TRANSITION / BRANCHING                               */
+/* ============================================================ */
+#scene-transition {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  padding: 40px;
+  gap: 24px;
+}
+
+.transition-stage {
+  position: relative;
+  width: 100%;
+  max-width: 760px;
+  height: 380px;
+}
+
+.transition-svg {
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.transition-controls {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.replay-button {
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 10px 22px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text);
+  border-radius: 100px;
+  cursor: pointer;
+  transition: all 0.25s var(--easing);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: var(--shadow-sm);
+}
+
+.replay-button:hover {
+  border-color: var(--text-2);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow);
+}
+
+.transition-narration {
+  position: absolute;
+  bottom: -24px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: 'Source Serif 4', serif;
+  font-style: italic;
+  font-size: 13px;
+  color: var(--text-3);
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 0.4s var(--easing);
+}
+
+.transition-narration.visible { opacity: 1; }
+
+/* FOOTER */
+footer.app-footer {
+  padding: 0 48px 24px;
+  text-align: center;
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  color: var(--text-3);
+  letter-spacing: 0.02em;
+  line-height: 1.6;
+}
+
+footer.app-footer p { margin: 2px 0; }
+footer.app-footer .next { opacity: 0.6; }
+
+@media (max-width: 760px) {
+  header.app-header { padding: 18px 16px 0; }
+  main.stage { margin: 16px 16px 20px; height: calc(100vh - 220px); }
+  .focused-current-card { min-width: auto; width: 100%; padding: 24px 20px; }
+  .focused-current-card .now-text { font-size: 22px; }
+  .brand h1 { font-size: 24px; }
+  footer.app-footer { padding: 0 16px 20px; }
+}
+</style>
+</head>
+<body>
+
+<header class="app-header">
+  <div class="brand">
+    <h1>Train of Thought</h1>
+    <span class="tagline">Claude Code companion · preview</span>
+  </div>
+  <nav class="scene-nav" role="tablist">
+    <button data-scene="minimized" class="active">Minimized</button>
+    <button data-scene="focused">Focused</button>
+    <button data-scene="tree">Full tree</button>
+    <button data-scene="transition">Branching</button>
+  </nav>
+</header>
+
+<main class="stage">
+
+  <!-- =========================================================== -->
+  <!-- SCENE: MINIMIZED                                              -->
+  <!-- =========================================================== -->
+  <section id="scene-minimized" class="scene active">
+    <span class="preview-caption">As it sits in your bottom-right corner while Claude is running</span>
+    <div class="desktop-mock">
+      <div class="titlebar">
+        <div class="dots"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
+        <span class="titlebar-label">claude — ~/Projects/aibos — 92×28</span>
+      </div>
+      <div class="fake-terminal" id="fake-terminal"></div>
+      <div class="minimized-widget" id="min-widget" title="Click to expand">
+        <span class="pulse-dot"></span>
+        <div class="text">
+          <span class="parent">AIBOS · TTS skill</span>
+          <span class="now">Testing bm_fable voice</span>
+        </div>
+        <span class="chevron">⌃</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- =========================================================== -->
+  <!-- SCENE: FOCUSED                                                -->
+  <!-- =========================================================== -->
+  <section id="scene-focused" class="scene">
+    <span class="preview-caption">Focused view — the current thought in the center</span>
+    <div class="focused-stack">
+      <span class="focused-parent-meta">Branched from</span>
+      <span class="focused-parent-label">TTS skill for Claude</span>
+      <div class="focused-stem"></div>
+      <div class="focused-current-card">
+        <div class="now-label">Working on now</div>
+        <div class="now-text" id="focused-typewriter"></div>
+        <div class="focused-meta">
+          <span class="pill">subtask</span>
+          <span>·</span>
+          <span>started 7 min ago</span>
+        </div>
+      </div>
+      <div class="focused-siblings">
+        <span class="focused-sibling done"><span class="status-dot"></span>Integrate Kokoro</span>
+        <span class="focused-sibling"><span class="status-dot"></span>Pick voice profile</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- =========================================================== -->
+  <!-- SCENE: FULL TREE                                              -->
+  <!-- =========================================================== -->
+  <section id="scene-tree" class="scene">
+    <span class="preview-caption">Full tree — click any node to focus · solid lines are subtasks, dashed are sidetracks</span>
+    <div class="tree-container" id="tree-container">
+      <svg class="tree-svg" id="tree-svg"></svg>
+    </div>
+    <div class="tree-legend">
+      <span class="item"><span class="swatch"></span>subtask</span>
+      <span class="item"><span class="swatch dashed"></span>sidetrack</span>
+      <span class="item"><span style="width:8px;height:8px;border-radius:50%;background:var(--accent)"></span>current</span>
+    </div>
+  </section>
+
+  <!-- =========================================================== -->
+  <!-- SCENE: TRANSITION (BRANCHING)                                 -->
+  <!-- =========================================================== -->
+  <section id="scene-transition" class="scene">
+    <span class="preview-caption">Branching animation — when you sidetrack from a project</span>
+    <div class="transition-stage" id="transition-stage">
+      <svg class="transition-svg" id="transition-svg"></svg>
+      <span class="transition-narration" id="narration"></span>
+    </div>
+    <div class="transition-controls">
+      <button class="replay-button" id="replay-btn">↻ Replay branching</button>
+    </div>
+  </section>
+
+</main>
+
+<footer class="app-footer">
+  <p>Preview only · click the tabs to step through the four views</p>
+  <p class="next">Next pass: Claude Code plugin (hooks → local daemon) + the actual display app, then GitHub + LinkedIn.</p>
+</footer>
+
+<script>
+// ============================================================
+// SCENE SWITCHER
+// ============================================================
+const sceneNavButtons = document.querySelectorAll('.scene-nav button');
+const scenes = document.querySelectorAll('.scene');
+
+sceneNavButtons.forEach(btn => {
+  btn.addEventListener('click', () => {
+    const target = btn.dataset.scene;
+    sceneNavButtons.forEach(b => b.classList.toggle('active', b === btn));
+    scenes.forEach(s => s.classList.toggle('active', s.id === `scene-${target}`));
+    setTimeout(() => onSceneEnter(target), 100);
+  });
+});
+
+function onSceneEnter(name) {
+  if (name === 'minimized') runFakeTerminal();
+  if (name === 'focused')   runFocusedTypewriter();
+  if (name === 'tree')      drawTree();
+  if (name === 'transition') runTransition();
+}
+
+window.addEventListener('load', () => {
+  runFakeTerminal();
+});
+
+// ============================================================
+// SCENE 1: FAKE TERMINAL (Claude Code mock)
+// ============================================================
+const terminalLines = [
+  { t: '<span class="prompt">~/Projects/aibos $</span> <span class="accent">claude</span>' },
+  { t: '' },
+  { t: '<span class="user">&gt; alright build the TTS skill that reads claude replies out loud</span>' },
+  { t: '' },
+  { t: "I'll scaffold this as a Claude Code skill. Checking what voices" },
+  { t: 'Kokoro has available first.' },
+  { t: '' },
+  { t: '<span class="tool">● Read</span>(~/.local/share/kokoro/voices.json)' },
+  { t: '  ⎿ Loaded 12 voices · <span class="accent">bm_fable</span> set as your preferred' },
+  { t: '' },
+  { t: '<span class="tool">● Write</span>(~/.claude/skills/claude-tts/SKILL.md)' },
+  { t: '  ⎿ Wrote 1.2 kB' },
+  { t: '' },
+  { t: 'Skill scaffolded. Now wiring up the actual TTS call so when' },
+  { t: 'Claude replies it pipes through Kokoro and plays through your' },
+  { t: 'default output using bm_fable…' },
+];
+
+function runFakeTerminal() {
+  const el = document.getElementById('fake-terminal');
+  if (!el) return;
+  el.innerHTML = '';
+  terminalLines.forEach((line, i) => {
+    const div = document.createElement('div');
+    div.className = 'line';
+    div.innerHTML = line.t || '&nbsp;';
+    div.style.animationDelay = (i * 0.09) + 's';
+    el.appendChild(div);
+  });
+}
+
+// ============================================================
+// SCENE 2: FOCUSED VIEW TYPEWRITER
+// ============================================================
+let focusedTypewriterTimer = null;
+
+function runFocusedTypewriter() {
+  const el = document.getElementById('focused-typewriter');
+  if (!el) return;
+  const text = "Testing bm_fable voice with Kokoro";
+  el.innerHTML = '';
+  if (focusedTypewriterTimer) clearTimeout(focusedTypewriterTimer);
+
+  let i = 0;
+  function step() {
+    if (i <= text.length) {
+      el.innerHTML = text.slice(0, i) + '<span class="cursor"></span>';
+      i++;
+      const ch = text[i-1];
+      const delay = (ch === ' ') ? 70 : 38 + Math.random() * 40;
+      focusedTypewriterTimer = setTimeout(step, delay);
+    } else {
+      el.innerHTML = text + '<span class="cursor"></span>';
+    }
+  }
+  setTimeout(step, 350);
+}
+
+// ============================================================
+// SCENE 3: TREE
+// ============================================================
+const treeData = {
+  nodes: [
+    { id: 'root',   x: 0.50, y: 0.08, label: 'Session · May 12',         kind: 'session' },
+    { id: 'aibos',  x: 0.42, y: 0.28, label: 'AIBOS Platform',           kind: 'project' },
+    { id: 'pos',    x: 0.18, y: 0.55, label: 'POS UI redesign',          kind: 'task',     status: 'paused' },
+    { id: 'stripe', x: 0.38, y: 0.55, label: 'Stripe webhook debug',     kind: 'task',     status: 'paused' },
+    { id: 'tts',    x: 0.72, y: 0.55, label: 'TTS skill for Claude',     kind: 'sidetrack', badge: 'sidetrack' },
+    { id: 'kokoro', x: 0.58, y: 0.82, label: 'Integrate Kokoro',         kind: 'task',     status: 'done' },
+    { id: 'voice',  x: 0.84, y: 0.82, label: 'Test bm_fable voice',      kind: 'current' },
+  ],
+  edges: [
+    { from: 'root',   to: 'aibos'  },
+    { from: 'aibos',  to: 'pos'    },
+    { from: 'aibos',  to: 'stripe' },
+    { from: 'aibos',  to: 'tts',    sidetrack: true },
+    { from: 'tts',    to: 'kokoro' },
+    { from: 'tts',    to: 'voice'  },
+  ],
+};
+
+function drawTree() {
+  const container = document.getElementById('tree-container');
+  const svg = document.getElementById('tree-svg');
+  if (!container || !svg) return;
+
+  container.querySelectorAll('.tree-node').forEach(n => n.remove());
+  svg.innerHTML = '';
+
+  const rect = container.getBoundingClientRect();
+  const W = rect.width, H = rect.height;
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+
+  const nodeById = Object.fromEntries(treeData.nodes.map(n => [n.id, n]));
+
+  treeData.edges.forEach((edge, i) => {
+    const from = nodeById[edge.from];
+    const to = nodeById[edge.to];
+    const x1 = from.x * W, y1 = from.y * H;
+    const x2 = to.x * W,   y2 = to.y * H;
+    const midY = (y1 + y2) / 2;
+
+    const path = `M ${x1} ${y1} C ${x1} ${midY}, ${x2} ${midY}, ${x2} ${y2}`;
+    const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    p.setAttribute('d', path);
+    p.setAttribute('fill', 'none');
+    p.setAttribute('stroke', edge.sidetrack ? '#B5826B' : '#D4CFC4');
+    p.setAttribute('stroke-width', '1.5');
+    p.setAttribute('stroke-linecap', 'round');
+
+    const len = Math.hypot(x2 - x1, y2 - y1) * 1.6;
+    if (edge.sidetrack) {
+      p.setAttribute('stroke-dasharray', '5 5');
+      p.style.opacity = '0';
+      p.style.transition = `opacity 0.6s var(--easing) ${0.3 + i * 0.1}s`;
+      svg.appendChild(p);
+      requestAnimationFrame(() => { p.style.opacity = '1'; });
+    } else {
+      p.style.strokeDasharray = `${len}`;
+      p.style.strokeDashoffset = `${len}`;
+      p.style.transition = `stroke-dashoffset 0.9s var(--easing) ${0.2 + i * 0.1}s`;
+      svg.appendChild(p);
+      requestAnimationFrame(() => { p.style.strokeDashoffset = '0'; });
+    }
+  });
+
+  treeData.nodes.forEach((node, i) => {
+    const el = document.createElement('div');
+    el.className = `tree-node ${node.kind}`;
+    if (node.status === 'done')   el.classList.add('done');
+    if (node.status === 'paused') el.classList.add('paused');
+    el.style.left = (node.x * 100) + '%';
+    el.style.top  = (node.y * 100) + '%';
+    el.style.opacity = '0';
+    el.style.transform = 'translate(-50%, calc(-50% + 6px))';
+    el.style.transition = `opacity 0.5s var(--easing) ${0.15 + i * 0.08}s, transform 0.5s var(--easing) ${0.15 + i * 0.08}s, box-shadow 0.25s var(--easing), border-color 0.25s var(--easing)`;
+
+    let html = '';
+    if (node.status) html += '<span class="status-dot"></span>';
+    html += node.label;
+    if (node.badge) html += `<span class="badge">${node.badge}</span>`;
+    el.innerHTML = html;
+    container.appendChild(el);
+
+    requestAnimationFrame(() => {
+      el.style.opacity = '1';
+      el.style.transform = 'translate(-50%, -50%)';
+    });
+  });
+}
+
+let resizeTimer = null;
+window.addEventListener('resize', () => {
+  if (resizeTimer) clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => {
+    if (document.getElementById('scene-tree').classList.contains('active'))      drawTree();
+    if (document.getElementById('scene-transition').classList.contains('active')) runTransition();
+  }, 120);
+});
+
+// ============================================================
+// SCENE 4: TRANSITION (Branching demo)
+// ============================================================
+function runTransition() {
+  const stage = document.getElementById('transition-stage');
+  const svg = document.getElementById('transition-svg');
+  const narration = document.getElementById('narration');
+  if (!stage || !svg) return;
+
+  stage.querySelectorAll('.tree-node').forEach(n => n.remove());
+  svg.innerHTML = '';
+  narration.classList.remove('visible');
+  narration.textContent = '';
+
+  const W = stage.clientWidth || 760;
+  const H = 380;
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+
+  const nodes = [
+    { id: 'a', x: 0.5,  y: 0.15, label: 'AIBOS Platform',           kind: 'project',   delay:  100 },
+    { id: 'b', x: 0.5,  y: 0.42, label: 'Building POS UI',          kind: 'task',      delay:  900 },
+    { id: 'c', x: 0.28, y: 0.78, label: '"too much reading…"',      kind: 'task',      delay: 1900, italic: true },
+    { id: 'd', x: 0.74, y: 0.78, label: 'TTS skill for Claude',     kind: 'sidetrack', delay: 2900 },
+  ];
+  const edges = [
+    { from: 'a', to: 'b',                    delay:  700 },
+    { from: 'b', to: 'c',                    delay: 1700 },
+    { from: 'b', to: 'd', sidetrack: true,   delay: 2700 },
+  ];
+  const narrations = [
+    { text: 'You start on the platform…',                  at:  400 },
+    { text: 'Begin a subtask…',                            at: 1200 },
+    { text: 'You hit a friction…',                         at: 2200 },
+    { text: 'And a sidetrack branches off',                at: 3200 },
+  ];
+
+  narrations.forEach(n => {
+    setTimeout(() => {
+      narration.textContent = n.text;
+      narration.classList.add('visible');
+    }, n.at);
+  });
+
+  nodes.forEach(s => {
+    const el = document.createElement('div');
+    el.className = `tree-node ${s.kind}`;
+    if (s.italic) el.style.fontStyle = 'italic';
+    el.style.left = (s.x * 100) + '%';
+    el.style.top  = (s.y * 100) + '%';
+    el.textContent = s.label;
+    el.style.opacity = '0';
+    el.style.transform = 'translate(-50%, calc(-50% + 10px))';
+    el.style.transition = 'opacity 0.5s var(--easing), transform 0.55s var(--spring)';
+    stage.appendChild(el);
+    setTimeout(() => {
+      el.style.opacity = '1';
+      el.style.transform = 'translate(-50%, -50%)';
+    }, s.delay);
+  });
+
+  const nodeById = Object.fromEntries(nodes.map(s => [s.id, s]));
+  edges.forEach(edge => {
+    const from = nodeById[edge.from];
+    const to = nodeById[edge.to];
+    const x1 = from.x * W, y1 = from.y * H;
+    const x2 = to.x * W,   y2 = to.y * H;
+    const midY = (y1 + y2) / 2;
+    const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    p.setAttribute('d', `M ${x1} ${y1} C ${x1} ${midY}, ${x2} ${midY}, ${x2} ${y2}`);
+    p.setAttribute('fill', 'none');
+    p.setAttribute('stroke', edge.sidetrack ? '#B5826B' : '#D4CFC4');
+    p.setAttribute('stroke-width', '1.5');
+    p.setAttribute('stroke-linecap', 'round');
+
+    const len = Math.hypot(x2 - x1, y2 - y1) * 1.6;
+    if (edge.sidetrack) {
+      p.setAttribute('stroke-dasharray', '5 5');
+      p.style.opacity = '0';
+      p.style.transition = 'opacity 0.7s var(--easing)';
+      svg.appendChild(p);
+      setTimeout(() => { p.style.opacity = '1'; }, edge.delay);
+    } else {
+      p.style.strokeDasharray = `${len}`;
+      p.style.strokeDashoffset = `${len}`;
+      p.style.transition = 'stroke-dashoffset 0.9s var(--easing)';
+      svg.appendChild(p);
+      setTimeout(() => { p.style.strokeDashoffset = '0'; }, edge.delay);
+    }
+  });
+}
+
+const replayBtn = document.getElementById('replay-btn');
+if (replayBtn) replayBtn.addEventListener('click', runTransition);
+</script>
+</body>
+</html>

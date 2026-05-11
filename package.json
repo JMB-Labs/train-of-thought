@@ -1,0 +1,23 @@
+{
+  "name": "train-of-thought",
+  "version": "0.1.0",
+  "description": "Live thought tree companion for Claude Code",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --enable-logging"
+  },
+  "keywords": [
+    "claude-code",
+    "thought-tree",
+    "electron"
+  ],
+  "author": "Jian Miguel Bautista",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^31.6.0"
+  },
+  "dependencies": {
+    "ws": "^8.20.0"
+  }
+}

@@ -1,0 +1,927 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Train of Thought</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,500;0,8..60,600;1,8..60,400&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg-card:     #FCFAF6;
+  --text:        #1F1E1B;
+  --text-2:      #5C544A;
+  --text-3:      #9C958A;
+  --accent:      #DA7756;
+  --accent-soft: rgba(218, 119, 86, 0.18);
+  --accent-glow: rgba(218, 119, 86, 0.32);
+  --border:      #E2DED4;
+  --line:        #BFB9AC;
+  --sidetrack:   #B5826B;
+  --shadow:      0 8px 32px rgba(31, 30, 27, 0.12), 0 2px 8px rgba(31, 30, 27, 0.06);
+  --easing:      cubic-bezier(0.16, 1, 0.3, 1);
+  --spring:      cubic-bezier(0.34, 1.46, 0.64, 1);
+}
+
+[data-theme="dark"] {
+  --bg-card:     #1F1E1D;
+  --text:        #A0BEDF;
+  --text-2:      #7E92B5;
+  --text-3:      #5C6580;
+  --accent:      #C8DCFA;
+  --accent-soft: rgba(200, 220, 250, 0.16);
+  --accent-glow: rgba(200, 220, 250, 0.28);
+  --border:      #3D3D3B;
+  --line:        #4E4E4C;
+  --sidetrack:   #D9A99B;
+  /* Omnidirectional shadow + directional drop — feathers ALL edges so the pill blends into the wallpaper */
+  --shadow:      0 0 32px rgba(0, 0, 0, 0.55), 0 12px 48px rgba(0, 0, 0, 0.45);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  font-family: 'Source Serif 4', Georgia, serif;
+  color: var(--text);
+  background: transparent;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: "kern" 1, "liga" 1, "calt" 1;
+  overflow: hidden;
+  user-select: none;
+  width: 100vw;
+  height: 100vh;
+  cursor: default;
+}
+
+#app {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  padding: 6px;
+}
+
+/* ============================================================
+   SHELL · the visible container · pill in min, card in max
+   ============================================================ */
+.shell {
+  position: absolute;
+  inset: 6px;
+  background: var(--bg-card);
+  border: none;
+  box-shadow: var(--shadow);
+  border-radius: 26px;
+  overflow: hidden;
+  transition:
+    border-radius 0.35s var(--easing),
+    background    0.35s var(--easing);
+}
+
+#app[data-view="minimized"] .shell {
+  border-radius: 100px;
+}
+
+/* ============================================================
+   DRAG · top edge only in max view
+   ============================================================ */
+.drag-handle {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 28px;
+  -webkit-app-region: drag;
+  z-index: 1;
+}
+
+#app[data-view="minimized"] .drag-handle { display: none; }
+
+button, .ctrl, .pill-overlay, .node {
+  -webkit-app-region: no-drag;
+}
+
+/* ============================================================
+   PILL OVERLAY · invisible click-catcher in min view to expand
+   ============================================================ */
+.pill-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 15;
+  cursor: pointer;
+  display: none;
+}
+
+#app[data-view="minimized"] .pill-overlay { display: block; }
+
+/* ============================================================
+   CANVAS / STAGE
+   ============================================================ */
+.canvas {
+  position: absolute;
+  inset: 0;
+  opacity: 1;
+  transition: opacity 0.25s var(--easing);
+}
+
+.stage {
+  position: absolute;
+  inset: 0;
+  transform-origin: 0 0;
+  transition: transform 0.35s var(--easing);
+  will-change: transform;
+}
+
+.edges {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.nodes {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* ============================================================
+   NODES · uniform pill with parent caps + name
+   ============================================================ */
+.node {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 100px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 0 22px;
+  gap: 2px;
+  min-width: 220px;
+  min-height: 60px;
+  pointer-events: auto;
+  cursor: pointer;
+  letter-spacing: -0.005em;
+  transition:
+    border-color 0.3s var(--easing),
+    box-shadow   0.4s var(--easing),
+    background   0.4s var(--easing);
+}
+
+.node:hover {
+  border-color: var(--text-3);
+}
+
+.node-parent {
+  font-family: 'Inter', sans-serif;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.node-now {
+  font-family: 'Source Serif 4', serif;
+  font-size: 14px;
+  color: var(--text);
+  letter-spacing: -0.005em;
+  line-height: 1.35;
+  white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* SESSION root: small dark badge, not a full pill */
+.node.session {
+  display: inline-block;
+  min-width: auto;
+  min-height: auto;
+  padding: 6px 13px;
+  background: var(--text);
+  color: var(--bg-card);
+  border-color: var(--text);
+  font-family: 'Inter', sans-serif;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+[data-theme="dark"] .node.session {
+  background: var(--accent);
+  color: #18171A;
+  border-color: var(--accent);
+}
+
+.node.sidetrack {
+  border-color: var(--sidetrack);
+  background: color-mix(in srgb, var(--sidetrack) 7%, var(--bg-card));
+}
+
+.node.sidetrack .node-now {
+  color: var(--sidetrack);
+  font-style: italic;
+}
+
+/* CURRENT · just the accent border, no halo */
+.node.current {
+  border-color: var(--accent);
+  z-index: 3;
+}
+
+/* In min view, the pill IS the node — keep all its visual styling */
+
+.node .badge {
+  display: inline-block;
+  margin-top: 3px;
+  padding: 1px 7px;
+  font-family: 'Inter', sans-serif;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  background: color-mix(in srgb, var(--sidetrack) 20%, transparent);
+  color: var(--sidetrack);
+  border-radius: 100px;
+  align-self: flex-start;
+}
+
+/* ============================================================
+   MAGIC WRITE · only on new-box creation
+   ============================================================ */
+.magic-char {
+  display: inline-block;
+  opacity: 0;
+  filter: blur(5px);
+  transform: translateY(3px);
+  animation: magicChar 0.95s var(--easing) forwards;
+}
+
+.magic-char.space { width: 0.28em; }
+
+@keyframes magicChar {
+  0%   { opacity: 0;    filter: blur(5px);   transform: translateY(3px); }
+  60%  { opacity: 0.85; filter: blur(0.5px); transform: translateY(0); }
+  100% { opacity: 1;    filter: blur(0);     transform: translateY(0); }
+}
+
+/* ============================================================
+   NODE ENTRANCE
+   ============================================================ */
+.node-entering {
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.55);
+}
+
+.node-entered {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+  transition: opacity 0.45s var(--easing), transform 0.65s var(--spring);
+}
+
+/* ============================================================
+   CONTROLS · hover-revealed top-right
+   ============================================================ */
+.controls {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: flex;
+  gap: 4px;
+  z-index: 20;
+  opacity: 0;
+  transition: opacity 0.3s var(--easing);
+}
+
+#app:not([data-view="minimized"]).show-controls .controls,
+#app:not([data-view="minimized"]) .controls:hover {
+  opacity: 1;
+}
+
+#app[data-view="minimized"] .controls {
+  opacity: 0 !important;
+  pointer-events: none;
+}
+
+.ctrl {
+  width: 24px;
+  height: 24px;
+  border-radius: 100px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  color: var(--text-2);
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s var(--easing);
+}
+
+.ctrl:hover {
+  color: var(--text);
+  border-color: var(--text-3);
+  transform: translateY(-1px);
+}
+
+.ctrl.close:hover {
+  color: #fff;
+  background: #E15554;
+  border-color: #E15554;
+}
+
+/* ============================================================
+   HINTS + LEGEND
+   ============================================================ */
+.hints {
+  position: absolute;
+  bottom: 10px;
+  left: 14px;
+  font-family: 'Inter', sans-serif;
+  font-size: 9px;
+  color: var(--text-3);
+  letter-spacing: 0.03em;
+  display: flex;
+  gap: 9px;
+  opacity: 0;
+  transition: opacity 0.4s var(--easing);
+  pointer-events: none;
+}
+
+#app.show-controls:not([data-view="minimized"]) .hints { opacity: 0.7; }
+
+.hints kbd {
+  display: inline-block;
+  font-family: 'Inter', sans-serif;
+  font-size: 8px;
+  font-weight: 600;
+  padding: 1px 5px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  margin-right: 3px;
+  color: var(--text-2);
+}
+
+.legend {
+  position: absolute;
+  bottom: 10px;
+  right: 14px;
+  display: flex;
+  gap: 11px;
+  font-family: 'Inter', sans-serif;
+  font-size: 9px;
+  color: var(--text-3);
+  align-items: center;
+  opacity: 0;
+  transition: opacity 0.4s var(--easing);
+  pointer-events: none;
+}
+
+#app[data-view="tree"] .legend { opacity: 0.72; }
+
+.legend .item { display: flex; align-items: center; gap: 5px; }
+.legend .swatch { width: 12px; height: 1px; background: var(--line); border-radius: 2px; }
+.legend .swatch.dashed { background: transparent; border-top: 1px dashed var(--sidetrack); height: 0; }
+.legend .glow {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--bg-card);
+  box-shadow: 0 0 0 1px var(--accent), 0 0 10px 2px var(--accent-glow);
+}
+
+</style>
+</head>
+<body>
+
+<div id="app" data-view="focused" data-theme="light">
+  <div class="shell">
+    <div class="drag-handle"></div>
+
+    <!-- TREE CANVAS · always rendered, transform changes per view -->
+    <div class="canvas" id="canvas">
+      <div class="stage" id="stage">
+        <svg class="edges" id="edges"></svg>
+        <div class="nodes" id="nodes"></div>
+      </div>
+    </div>
+
+    <!-- INVISIBLE CLICK-CATCHER in min view to expand -->
+    <div class="pill-overlay" id="pill-overlay" title="Click to expand"></div>
+
+    <!-- CONTROLS -->
+    <div class="controls">
+      <button class="ctrl" id="theme-btn"  title="Theme · D">◐</button>
+      <button class="ctrl" id="view-btn"   title="View · T">⊞</button>
+      <button class="ctrl" id="branch-btn" title="Branch · B">+</button>
+      <button class="ctrl" id="mini-btn"   title="Minimize · Esc">−</button>
+      <button class="ctrl close" id="close-btn" title="Quit">×</button>
+    </div>
+
+    <div class="hints">
+      <span><kbd>T</kbd>view</span>
+      <span><kbd>B</kbd>branch</span>
+      <span><kbd>D</kbd>theme</span>
+      <span><kbd>Esc</kbd>min</span>
+    </div>
+
+    <div class="legend">
+      <span class="item"><span class="swatch"></span>subtask</span>
+      <span class="item"><span class="swatch dashed"></span>sidetrack</span>
+      <span class="item"><span class="glow"></span>current</span>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// STATE
+// ============================================================
+const state = {
+  view: 'focused',
+  theme: localStorage.getItem('toot-theme') || 'light',
+  currentId: 'voice',
+  branchCounter: 0,
+};
+
+// Window dimensions (must match main.js)
+const TARGET_W = 800;
+const TARGET_H = 560;
+const PILL_W = 240;
+const PILL_H = 80;
+
+// Logical tree layout for the 800×560 canvas
+const tree = {
+  nodes: [
+    { id: 'root',   x: 400, y:  45, label: 'Session · May 12',     kind: 'session' },
+    { id: 'aibos',  x: 400, y: 130, label: 'AIBOS Platform',       kind: 'project' },
+    { id: 'pos',    x: 150, y: 245, label: 'POS UI redesign',      kind: 'task' },
+    { id: 'stripe', x: 400, y: 245, label: 'Stripe webhook',       kind: 'task' },
+    { id: 'tts',    x: 650, y: 245, label: 'TTS skill for Claude', kind: 'sidetrack', badge: 'sidetrack' },
+    { id: 'kokoro', x: 400, y: 400, label: 'Integrate Kokoro',     kind: 'task' },
+    { id: 'voice',  x: 650, y: 400, label: 'Test bm_fable voice',  kind: 'task' },
+  ],
+  edges: [
+    { from: 'root',   to: 'aibos' },
+    { from: 'aibos',  to: 'pos' },
+    { from: 'aibos',  to: 'stripe' },
+    { from: 'aibos',  to: 'tts',    sidetrack: true },
+    { from: 'tts',    to: 'kokoro' },
+    { from: 'tts',    to: 'voice' },
+  ],
+};
+let nodeById = Object.fromEntries(tree.nodes.map(n => [n.id, n]));
+
+// Daemon connection state
+let ws = null;
+let isLive = false;
+
+// ============================================================
+// THEME
+// ============================================================
+function applyTheme() {
+  document.getElementById('app').dataset.theme = state.theme;
+  localStorage.setItem('toot-theme', state.theme);
+}
+function toggleTheme() {
+  state.theme = state.theme === 'light' ? 'dark' : 'light';
+  applyTheme();
+}
+
+// ============================================================
+// VIEW · stage transform changes per view
+// ============================================================
+function setView(view) {
+  const prev = state.view;
+  if (prev === view) return;
+  state.view = view;
+  document.getElementById('app').dataset.view = view;
+  // Synced transition matching the window resize tween
+  document.getElementById('stage').style.transition = 'transform 0.35s var(--easing)';
+  if (window.toot) window.toot.setView(view);
+  applyTransform();
+}
+
+function applyTransform() {
+  const stage = document.getElementById('stage');
+  const node = nodeById[state.currentId];
+  if (!node) return;
+
+  if (state.view === 'minimized') {
+    // Center the current node in the small pill window's inner area (shell inset 6 each side)
+    const scale = 1.0;
+    const innerW = PILL_W - 12;
+    const innerH = PILL_H - 12;
+    const tx = (innerW / 2) - node.x * scale;
+    const ty = (innerH / 2) - node.y * scale;
+    stage.style.transform = `translate(${tx}px, ${ty}px) scale(${scale})`;
+  } else if (state.view === 'tree') {
+    // Fit-all
+    const xs = tree.nodes.map(n => n.x);
+    const ys = tree.nodes.map(n => n.y);
+    const minX = Math.min(...xs) - 120, maxX = Math.max(...xs) + 120;
+    const minY = Math.min(...ys) -  60, maxY = Math.max(...ys) +  60;
+    const tw = maxX - minX, th = maxY - minY;
+    const pad = 40;
+    const scale = Math.min((TARGET_W - pad * 2) / tw, (TARGET_H - pad * 2) / th, 1);
+    const cx = (minX + maxX) / 2;
+    const cy = (minY + maxY) / 2;
+    const tx = TARGET_W / 2 - cx * scale;
+    const ty = TARGET_H / 2 - cy * scale;
+    stage.style.transform = `translate(${tx}px, ${ty}px) scale(${scale})`;
+  } else {
+    // Focused: center current with parent visible above, scale 1.0 (no zoom)
+    const scale = 1.0;
+    const tx = TARGET_W / 2 - node.x * scale;
+    const ty = (TARGET_H / 2 + 50) - node.y * scale;
+    stage.style.transform = `translate(${tx}px, ${ty}px) scale(${scale})`;
+  }
+}
+
+function toggleView() {
+  if (state.view === 'tree') setView('focused');
+  else setView('tree');
+}
+
+// ============================================================
+// RENDER · nodes (uniform pill style for all non-session)
+// ============================================================
+function renderNodes(opts = {}) {
+  const magicIds = opts.magicIds || new Set();
+  const container = document.getElementById('nodes');
+  container.innerHTML = '';
+  tree.nodes.forEach((node, i) => {
+    const el = addNodeEl(node, { delay: 80 + i * 50, scaleIn: true });
+    if (magicIds.has(node.id)) {
+      // Magic-write the label for newly-arrived nodes
+      const labelSpan = el.querySelector('.node-now');
+      if (labelSpan) setTimeout(() => magicWrite(labelSpan, node.label), 400);
+    }
+  });
+}
+
+function addNodeEl(node, opts = {}) {
+  const container = document.getElementById('nodes');
+  const el = document.createElement('div');
+  el.className = `node ${node.kind}`;
+  if (node.id === state.currentId) el.classList.add('current');
+  el.style.left = node.x + 'px';
+  el.style.top  = node.y + 'px';
+  el.dataset.id = node.id;
+
+  fillNodeHTML(el, node);
+
+  el.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (node.kind === 'session') return;
+    focusNode(node.id);
+  });
+
+  if (opts.scaleIn) {
+    el.classList.add('node-entering');
+    container.appendChild(el);
+    setTimeout(() => {
+      el.classList.add('node-entered');
+      el.classList.remove('node-entering');
+    }, opts.delay || 0);
+  } else {
+    container.appendChild(el);
+  }
+  return el;
+}
+
+// Every non-session node gets parent caps + name layout
+function fillNodeHTML(el, node) {
+  let html = '';
+  if (node.kind === 'session') {
+    html = escapeHtml(node.label);
+  } else {
+    const parents = findParents(node.id);
+    const parentLabel = parents.length ? parents[0].label : '';
+    if (parentLabel) {
+      html += `<span class="node-parent">${escapeHtml(parentLabel)}</span>`;
+    }
+    html += `<span class="node-now">${escapeHtml(node.label)}</span>`;
+  }
+  if (node.badge) html += `<span class="badge">${escapeHtml(node.badge)}</span>`;
+  el.innerHTML = html;
+}
+
+function findParents(id, acc = []) {
+  const edge = tree.edges.find(e => e.to === id);
+  if (!edge) return acc;
+  const parent = nodeById[edge.from];
+  if (!parent || parent.kind === 'session') return acc;
+  acc.unshift(parent);
+  return findParents(parent.id, acc);
+}
+
+function focusNode(id) {
+  if (state.currentId === id) return;
+  state.currentId = id;
+  document.querySelectorAll('.node').forEach(el => {
+    el.classList.toggle('current', el.dataset.id === state.currentId);
+  });
+  // Slower, smoother camera pan when navigating between pills
+  document.getElementById('stage').style.transition = 'transform 1.05s var(--easing)';
+  applyTransform();
+  // Tell daemon
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({ type: 'focus-node', id }));
+  }
+}
+
+// ============================================================
+// DAEMON CONNECTION + LIVE STATE
+// ============================================================
+function connectDaemon() {
+  try {
+    ws = new WebSocket('ws://127.0.0.1:3801');
+    ws.onopen = () => { isLive = true; document.getElementById('app').classList.add('live'); };
+    ws.onclose = () => {
+      isLive = false;
+      document.getElementById('app').classList.remove('live');
+      setTimeout(connectDaemon, 2000);
+    };
+    ws.onerror = () => { /* will reconnect via onclose */ };
+    ws.onmessage = (event) => {
+      try {
+        const msg = JSON.parse(event.data);
+        if (msg.type === 'state') applyDaemonState(msg.state);
+      } catch (e) { /* ignore */ }
+    };
+  } catch (e) {
+    setTimeout(connectDaemon, 2000);
+  }
+}
+
+function applyDaemonState(daemonState) {
+  if (!daemonState || !Array.isArray(daemonState.nodes) || daemonState.nodes.length === 0) {
+    return; // keep mock tree on empty daemon state
+  }
+  // Detect new nodes that should magic-write
+  const previousIds = new Set(tree.nodes.map(n => n.id));
+  const newIds = new Set();
+  for (const n of daemonState.nodes) {
+    if (!previousIds.has(n.id)) newIds.add(n.id);
+  }
+
+  tree.nodes = daemonState.nodes.map(n => ({ ...n }));
+  tree.edges = daemonState.edges.map(e => ({ ...e }));
+  if (daemonState.currentId) state.currentId = daemonState.currentId;
+
+  layoutTree();
+
+  // Rebuild nodeById
+  for (const k of Object.keys(nodeById)) delete nodeById[k];
+  Object.assign(nodeById, Object.fromEntries(tree.nodes.map(n => [n.id, n])));
+
+  renderEdges();
+  renderNodes({ magicIds: newIds });
+  updatePill();
+  applyTransform();
+}
+
+// Top-down auto-layout for daemon-supplied nodes (which don't have x/y)
+function layoutTree() {
+  const LEVEL_H = 130;
+  const NODE_W = 270;
+  const TOP_Y = 50;
+  const byId = Object.fromEntries(tree.nodes.map(n => [n.id, n]));
+  const childrenMap = {};
+  for (const e of tree.edges) {
+    (childrenMap[e.from] = childrenMap[e.from] || []).push(e.to);
+  }
+  const hasParent = new Set(tree.edges.map(e => e.to));
+  const roots = tree.nodes.filter(n => !hasParent.has(n.id));
+
+  function subtreeWidth(id) {
+    const children = childrenMap[id] || [];
+    if (children.length === 0) return NODE_W;
+    return children.reduce((sum, c) => sum + subtreeWidth(c), 0);
+  }
+
+  function position(id, centerX, depth) {
+    const node = byId[id];
+    if (!node) return;
+    node.x = centerX;
+    node.y = TOP_Y + depth * LEVEL_H;
+    const children = childrenMap[id] || [];
+    if (children.length === 0) return;
+    let cursor = centerX - subtreeWidth(id) / 2;
+    for (const childId of children) {
+      const w = subtreeWidth(childId);
+      position(childId, cursor + w / 2, depth + 1);
+      cursor += w;
+    }
+  }
+
+  let rootCursor = 0;
+  for (const root of roots) {
+    const w = subtreeWidth(root.id);
+    position(root.id, rootCursor + w / 2, 0);
+    rootCursor += w + 80;
+  }
+
+  if (tree.nodes.length > 0) {
+    const minX = Math.min(...tree.nodes.map(n => n.x));
+    const maxX = Math.max(...tree.nodes.map(n => n.x));
+    const offset = (TARGET_W / 2) - (minX + maxX) / 2;
+    for (const n of tree.nodes) n.x += offset;
+  }
+}
+
+// ============================================================
+// RENDER · EDGES (thin 1px lines)
+// ============================================================
+function renderEdges() {
+  const svg = document.getElementById('edges');
+  svg.innerHTML = '';
+  svg.setAttribute('viewBox', `0 0 ${TARGET_W} ${TARGET_H}`);
+  tree.edges.forEach((edge, i) => addEdgeEl(edge, { delay: 60 + i * 60 }));
+}
+
+function addEdgeEl(edge, opts = {}) {
+  const svg = document.getElementById('edges');
+  const from = nodeById[edge.from];
+  const to   = nodeById[edge.to];
+  if (!from || !to) return;
+
+  const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  p.setAttribute('d', curvePath(from.x, from.y, to.x, to.y));
+  p.setAttribute('fill', 'none');
+  p.setAttribute('stroke', edge.sidetrack ? 'var(--sidetrack)' : 'var(--line)');
+  p.setAttribute('stroke-width', '1');
+  p.setAttribute('stroke-linecap', 'round');
+
+  const len = pathLength(from, to);
+  if (edge.sidetrack) {
+    p.setAttribute('stroke-dasharray', '4 4');
+    p.style.opacity = '0';
+    p.style.transition = `opacity 0.85s var(--easing) ${opts.delay / 1000}s`;
+    svg.appendChild(p);
+    requestAnimationFrame(() => { p.style.opacity = '1'; });
+  } else {
+    p.style.strokeDasharray = `${len}`;
+    p.style.strokeDashoffset = `${len}`;
+    p.style.transition = `stroke-dashoffset 0.95s var(--easing) ${opts.delay / 1000}s`;
+    svg.appendChild(p);
+    requestAnimationFrame(() => { p.style.strokeDashoffset = '0'; });
+  }
+  return p;
+}
+
+function curvePath(x1, y1, x2, y2) {
+  const midY = (y1 + y2) / 2;
+  return `M ${x1} ${y1} C ${x1} ${midY}, ${x2} ${midY}, ${x2} ${y2}`;
+}
+
+function pathLength(a, b) {
+  return Math.hypot(b.x - a.x, b.y - a.y) * 1.6;
+}
+
+// ============================================================
+// MAGIC WRITE · only called when a new box is created (B key)
+// ============================================================
+function magicWrite(el, text, charDelay = 50) {
+  el.innerHTML = '';
+  const chars = [...text];
+  chars.forEach((ch, i) => {
+    const span = document.createElement('span');
+    span.className = 'magic-char';
+    if (ch === ' ') {
+      span.classList.add('space');
+      span.innerHTML = '&nbsp;';
+    } else {
+      span.textContent = ch;
+    }
+    span.style.animationDelay = (i * charDelay) + 'ms';
+    el.appendChild(span);
+  });
+}
+
+// ============================================================
+// BRANCH DEMO · spawns a new sidetrack from current
+// ============================================================
+const branchLabels = [
+  'Make a video about this',
+  'Show Sir on Telegram',
+  'Add MCP server support',
+  'Test on the Mac mini',
+  'Write the launch post',
+];
+
+function demoBranch() {
+  state.branchCounter++;
+  const parent = nodeById[state.currentId];
+  if (!parent) return;
+  const label = branchLabels[(state.branchCounter - 1) % branchLabels.length];
+  const offset = state.branchCounter % 2 === 0 ? 220 : -220;
+
+  const newNode = {
+    id: `b-${state.branchCounter}`,
+    x: parent.x + offset,
+    y: parent.y + 140,
+    label,
+    kind: 'sidetrack',
+    badge: 'sidetrack',
+  };
+  tree.nodes.push(newNode);
+  nodeById[newNode.id] = newNode;
+  tree.edges.push({ from: parent.id, to: newNode.id, sidetrack: true });
+
+  // 1) Line fades in
+  addEdgeEl({ from: parent.id, to: newNode.id, sidetrack: true }, { delay: 0 });
+
+  // 2) Node materializes
+  setTimeout(() => {
+    const container = document.getElementById('nodes');
+    const el = document.createElement('div');
+    el.className = `node ${newNode.kind}`;
+    el.style.left = newNode.x + 'px';
+    el.style.top  = newNode.y + 'px';
+    el.dataset.id = newNode.id;
+    const parentLabel = parent.label;
+    el.innerHTML =
+      `<span class="node-parent">${escapeHtml(parentLabel)}</span>` +
+      `<span class="node-now magic-target"></span>` +
+      `<span class="badge">sidetrack</span>`;
+    el.classList.add('node-entering');
+    container.appendChild(el);
+    el.addEventListener('click', (e) => { e.stopPropagation(); focusNode(newNode.id); });
+
+    requestAnimationFrame(() => {
+      el.classList.add('node-entered');
+      el.classList.remove('node-entering');
+    });
+
+    // 3) Magic write
+    setTimeout(() => {
+      const magic = el.querySelector('.magic-target');
+      if (magic) magicWrite(magic, label);
+    }, 300);
+  }, 560);
+}
+
+// ============================================================
+// HELPERS
+// ============================================================
+function escapeHtml(s) {
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+// ============================================================
+// INIT
+// ============================================================
+function init() {
+  applyTheme();
+  renderEdges();
+  renderNodes();
+  applyTransform();
+
+  document.getElementById('pill-overlay').addEventListener('click', () => setView('focused'));
+  document.getElementById('theme-btn').addEventListener('click', toggleTheme);
+  document.getElementById('view-btn').addEventListener('click', toggleView);
+  document.getElementById('mini-btn').addEventListener('click', () => setView('minimized'));
+  document.getElementById('branch-btn').addEventListener('click', demoBranch);
+  document.getElementById('close-btn').addEventListener('click', () => {
+    if (window.toot) window.toot.quit();
+    else window.close();
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    if      (e.key === 'Escape') setView('minimized');
+    else if (e.key === 't' || e.key === 'T') toggleView();
+    else if (e.key === 'd' || e.key === 'D') toggleTheme();
+    else if (e.key === 'b' || e.key === 'B') demoBranch();
+  });
+
+  document.body.addEventListener('mousemove', (e) => {
+    if (state.view === 'minimized') return;
+    if (e.clientY < 50) document.getElementById('app').classList.add('show-controls');
+    else                document.getElementById('app').classList.remove('show-controls');
+  });
+
+  connectDaemon();
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', init);
+} else {
+  init();
+}
+</script>
+</body>
+</html>
