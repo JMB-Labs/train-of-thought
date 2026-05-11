@@ -1,4 +1,4 @@
-const { app, BrowserWindow, screen, ipcMain } = require('electron');
+const { app, BrowserWindow, screen, ipcMain, systemPreferences, dialog, shell } = require('electron');
 const { spawn, exec } = require('child_process');
 const http = require('http');
 const path = require('path');
@@ -13,6 +13,7 @@ const FOLLOW_APPS = ['Claude', 'Conductor', 'iTerm2', 'Terminal', 'Code'];
 
 function queryAppWindow(appName) {
   return new Promise((resolve) => {
+    // Return a list so osascript prints "x, y, w, h" cleanly
     const script =
       `tell application "System Events"\n` +
       `  if not (exists (process "${appName}")) then return ""\n` +
@@ -20,25 +21,45 @@ function queryAppWindow(appName) {
       `    if (count of windows) = 0 then return ""\n` +
       `    set p to position of front window\n` +
       `    set s to size of front window\n` +
-      `    return (item 1 of p as integer) & "," & (item 2 of p as integer) & "," & (item 1 of s as integer) & "," & (item 2 of s as integer)\n` +
+      `    return {item 1 of p, item 2 of p, item 1 of s, item 2 of s}\n` +
       `  end tell\n` +
       `end tell`;
-    exec(`osascript -e ${JSON.stringify(script)}`, { timeout: 800 }, (err, stdout) => {
-      if (err) return resolve(null);
-      const out = (stdout || '').toString().trim();
-      if (!out) return resolve(null);
-      const parts = out.split(',').map(s => parseInt(s.trim(), 10));
-      if (parts.some(isNaN)) return resolve(null);
+    // Use spawn with absolute osascript path (Electron's restricted PATH can miss it)
+    const ps = spawn('/usr/bin/osascript', ['-e', script]);
+    let stdout = '';
+    let stderr = '';
+    const t = setTimeout(() => { try { ps.kill(); } catch {} resolve(null); }, 25000);
+    ps.stdout.on('data', d => stdout += d);
+    ps.stderr.on('data', d => stderr += d);
+    ps.on('close', (code) => {
+      clearTimeout(t);
+      if (code !== 0) {
+        console.log(`[toot] ${appName} osascript exit=${code} stderr="${stderr.trim()}" stdout="${stdout.trim()}"`);
+        return resolve(null);
+      }
+      if (!stdout.trim()) return resolve(null);
+      const parts = stdout.trim().split(',').map(s => parseInt(s.trim(), 10));
+      if (parts.some(isNaN)) {
+        console.log(`[toot] ${appName} unparseable stdout="${stdout.trim()}"`);
+        return resolve(null);
+      }
       const [x, y, w, h] = parts;
       resolve({ x, y, width: w, height: h });
     });
+    ps.on('error', (e) => { clearTimeout(t); console.log(`[toot] ${appName} spawn error: ${e.message}`); resolve(null); });
   });
 }
 
 async function findHostWindow() {
+  console.log('[toot] findHostWindow polling...');
   for (const appName of FOLLOW_APPS) {
     const bounds = await queryAppWindow(appName);
-    if (bounds && bounds.width > 200 && bounds.height > 200) return bounds;
+    if (bounds) {
+      console.log(`[toot]   ${appName}: ${bounds.x},${bounds.y} ${bounds.width}x${bounds.height}`);
+      if (bounds.width > 200 && bounds.height > 200) return bounds;
+    } else {
+      console.log(`[toot]   ${appName}: not found / no bounds`);
+    }
   }
   return null;
 }
@@ -69,7 +90,7 @@ async function startDaemon() {
 const SIZE_FULL = { w: 800, h: 560 };
 const SIZE_PILL = { w: 240, h: 80 };
 const MARGIN_RIGHT = 24;
-const MARGIN_TOP = 70;
+const MARGIN_TOP = 100;
 const HOST_ANCHOR_OFFSET = { right: 18, top: 86 };
 
 let cachedHost = null;
@@ -125,40 +146,58 @@ function createWindow() {
   win.setAlwaysOnTop(true, 'floating');
 }
 
-// Trigger macOS Accessibility prompt for Electron if not already granted.
-// First osascript call against System Events will pop the dialog.
-function triggerAccessibilityPrompt() {
-  exec(`osascript -e 'tell application "System Events" to return name of first process'`, { timeout: 800 }, (err) => {
-    if (err) console.log('[toot] Accessibility permission needed for host-window tracking. System Settings → Privacy & Security → Accessibility → add Electron.');
-  });
+// macOS Accessibility — call with `true` to trigger the system permission prompt if not granted.
+function ensureAccessibility() {
+  if (process.platform !== 'darwin') return true;
+  const trusted = systemPreferences.isTrustedAccessibilityClient(true); // true = prompt if missing
+  console.log('[toot] Accessibility trusted:', trusted);
+  if (!trusted) {
+    // Show a friendly dialog with the deeplink so Sir can find the settings
+    setTimeout(() => {
+      const r = dialog.showMessageBoxSync({
+        type: 'info',
+        title: 'Accessibility permission',
+        message: 'Train of Thought needs Accessibility permission to anchor the pill to your Claude window.',
+        detail: 'Open System Settings → Privacy & Security → Accessibility, then enable Electron. After enabling, restart the app.',
+        buttons: ['Open Accessibility Settings', 'Later'],
+        defaultId: 0,
+      });
+      if (r === 0) {
+        shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility');
+      }
+    }, 600);
+  }
+  return trusted;
 }
 
 app.whenReady().then(async () => {
-  triggerAccessibilityPrompt();
+  ensureAccessibility();
   await startDaemon();
   await refreshHost();
   createWindow();
   startFollowingHost();
 });
 
-// Poll the host (Claude / Conductor / Terminal) window position and reposition the pill to track it.
+// Find the host window in the background once at startup. AppleScript via Electron's
+// sandboxed spawn is sluggish (10-25s cold), so we DON'T poll — we do one fire-and-forget
+// query and reposition when it resolves. If the user moves Claude later, ⌘R in the app
+// (or relaunch) re-anchors.
 function startFollowingHost() {
   if (followTimer) clearInterval(followTimer);
-  followTimer = setInterval(async () => {
+  // Single deferred query — runs in background, doesn't block app launch
+  setTimeout(async () => {
     if (!win || win.isDestroyed()) return;
     const host = await findHostWindow();
-    if (!host) return;
-    const key = `${host.x},${host.y},${host.width},${host.height}`;
-    if (key === lastHostKey) return;
-    lastHostKey = key;
+    if (!host) {
+      console.log('[toot] No host found, staying anchored to screen.');
+      return;
+    }
     cachedHost = host;
-    // Reposition based on current view (pill vs full). Use width as the discriminator.
+    lastHostKey = `${host.x},${host.y},${host.width},${host.height}`;
     const cur = win.getBounds();
     const isMin = Math.abs(cur.width - SIZE_PILL.w) < 30;
-    const target = isMin ? pillBounds() : fullBounds();
-    // Smooth-tween into the new position
-    smoothResize(target, 300);
-  }, 1000);
+    smoothResize(isMin ? pillBounds() : fullBounds(), 400);
+  }, 100);
 }
 
 app.on('before-quit', () => {
