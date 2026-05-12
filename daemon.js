@@ -154,28 +154,37 @@ function handleEvent(event) {
     state.currentId = state.sessions[sessionId].rootId;
   } else if (event.type === 'user-prompt') {
     const session = ensureSession(sessionId, cwd);
-    const parentId = session.lastNodeId;
-    const parentNode = state.nodes.find(n => n.id === parentId);
-    const isSidetrack = parentNode && parentNode.cwd && cwd && parentNode.cwd !== cwd;
-    const newId = `p-${Date.now()}`;
-    state.nodes.push({
-      id: newId,
-      label: summarize(event.prompt),
-      kind: isSidetrack ? 'sidetrack' : 'task',
-      badge: isSidetrack ? 'sidetrack' : undefined,
-      parentId,
-      sessionId,
-      cwd,
-      timestamp: new Date().toISOString(),
-    });
-    state.edges.push({
-      from: parentId,
-      to: newId,
-      sidetrack: isSidetrack,
-    });
-    session.lastNodeId = newId;
-    state.currentId = newId;
-    state.thinkingNodeId = newId;  // Claude is now working on this thought
+    const lastId = session.lastNodeId;
+    const lastNode = state.nodes.find(n => n.id === lastId);
+
+    // Only create a new node when:
+    //  - There's no non-session "current task" yet, OR
+    //  - The cwd has changed (different project = sidetrack/new tree)
+    // Otherwise, treat this prompt as a continuation of the same task and just mark thinking.
+    const isFirstTask = !lastNode || lastNode.kind === 'session';
+    const isCwdChange = lastNode && lastNode.cwd && cwd && lastNode.cwd !== cwd;
+
+    if (isFirstTask || isCwdChange) {
+      const newId = `p-${Date.now()}`;
+      state.nodes.push({
+        id: newId,
+        label: summarize(event.prompt),
+        kind: isCwdChange ? 'sidetrack' : 'task',
+        badge: isCwdChange ? 'sidetrack' : undefined,
+        parentId: lastId,
+        sessionId,
+        cwd,
+        timestamp: new Date().toISOString(),
+      });
+      state.edges.push({ from: lastId, to: newId, sidetrack: !!isCwdChange });
+      session.lastNodeId = newId;
+      state.currentId = newId;
+      state.thinkingNodeId = newId;
+    } else {
+      // Same task, same cwd — just refresh thinking state. Label will refine via Stop hook.
+      state.currentId = lastId;
+      state.thinkingNodeId = lastId;
+    }
   } else if (event.type === 'stop') {
     // Claude finished responding — clear thinking state
     state.thinkingNodeId = null;

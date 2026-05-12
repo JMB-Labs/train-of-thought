@@ -69,12 +69,10 @@ html, body {
   inset: 6px;
   background: var(--bg-card);
   border: none;
-  box-shadow: var(--shadow);
+  box-shadow: none;  /* no shadow = no "frame halo" around the pill */
   border-radius: 26px;
   overflow: hidden;
-  transition:
-    border-radius 0.35s var(--easing),
-    background    0.35s var(--easing);
+  transition: background 0.35s var(--easing);
 }
 
 /* MIN VIEW: hide the tree canvas, show pill-content (the text directly inside the shell) */
