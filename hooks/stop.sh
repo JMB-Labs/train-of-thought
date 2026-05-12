@@ -52,8 +52,13 @@ if [ -n "$TRANSCRIPT_PATH" ] && [ -f "$TRANSCRIPT_PATH" ]; then
               if (part.type === "text" && part.text) text += part.text + "\n";
             }
           }
-          // Accept HTML-comment form OR legacy XML tag
-          let m = text.match(/<!--\s*toot:\s*([^\n>]+?)\s*-->/i);
+          // Find label format. Check most-specific first.
+          // 1) Italic-first-line: response begins with *label* on its own line
+          // 2) HTML comment fallback: <!--toot:label-->
+          // 3) Legacy XML: <train-of-thought>label</train-of-thought>
+          const firstNonEmpty = text.split("\n").map(l => l.trim()).find(l => l.length > 0) || "";
+          let m = firstNonEmpty.match(/^\*([^*\n]{2,40})\*$/);
+          if (!m) m = text.match(/<!--\s*toot:\s*([^\n>]+?)\s*-->/i);
           if (!m) m = text.match(/<train-of-thought>([\s\S]*?)<\/train-of-thought>/i);
           if (m) { process.stdout.write(m[1].trim()); return; }
           if (text.trim()) return; // bailed at first non-empty assistant message even without tag

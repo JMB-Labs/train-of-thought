@@ -583,10 +583,10 @@ const state = {
 };
 
 // Window dimensions (must match main.js)
-const TARGET_W = 800;
-const TARGET_H = 560;
-const PILL_W = 240;
-const PILL_H = 80;
+const TARGET_W = 320;
+const TARGET_H = 720;
+const PILL_W = 320;
+const PILL_H = 96;
 
 // Logical tree layout for the 800×560 canvas
 const tree = {
@@ -646,13 +646,12 @@ function applyTransform() {
   if (!node) return;
 
   if (state.view === 'minimized') {
-    // Center the current node in the small pill window's inner area (shell inset 6 each side)
-    const scale = 1.0;
+    // Center the current node in the small pill window's inner area
     const innerW = PILL_W - 12;
     const innerH = PILL_H - 12;
-    const tx = (innerW / 2) - node.x * scale;
-    const ty = (innerH / 2) - node.y * scale;
-    stage.style.transform = `translate(${tx}px, ${ty}px) scale(${scale})`;
+    const tx = (innerW / 2) - node.x;
+    const ty = (innerH / 2) - node.y;
+    stage.style.transform = `translate(${tx}px, ${ty}px) scale(1)`;
   } else if (state.view === 'tree') {
     // Fit-all
     const xs = tree.nodes.map(n => n.x);
@@ -864,53 +863,37 @@ function updatePill() {
   if (pillNow)    pillNow.textContent = node.label;
 }
 
-// Top-down auto-layout for daemon-supplied nodes (which don't have x/y)
+// Vertical single-column layout — all nodes stack top-to-bottom in DFS order.
+// Sidetracks get a small x-offset so the connecting line shows the branch visually.
 function layoutTree() {
-  const LEVEL_H = 130;
-  const NODE_W = 270;
-  const TOP_Y = 50;
+  const TOP_Y = 56;
+  const ROW_H = 92;
+  const CENTER_X = TARGET_W / 2;
+  const SIDE_OFFSET = 24;
   const byId = Object.fromEntries(tree.nodes.map(n => [n.id, n]));
   const childrenMap = {};
-  for (const e of tree.edges) {
-    (childrenMap[e.from] = childrenMap[e.from] || []).push(e.to);
-  }
+  for (const e of tree.edges) (childrenMap[e.from] = childrenMap[e.from] || []).push(e.to);
   const hasParent = new Set(tree.edges.map(e => e.to));
   const roots = tree.nodes.filter(n => !hasParent.has(n.id));
 
-  function subtreeWidth(id) {
-    const children = childrenMap[id] || [];
-    if (children.length === 0) return NODE_W;
-    return children.reduce((sum, c) => sum + subtreeWidth(c), 0);
-  }
-
-  function position(id, centerX, depth) {
+  let yCursor = TOP_Y;
+  function visit(id, sideOffset) {
     const node = byId[id];
     if (!node) return;
-    node.x = centerX;
-    node.y = TOP_Y + depth * LEVEL_H;
+    node.x = CENTER_X + sideOffset;
+    node.y = yCursor;
+    yCursor += ROW_H;
     const children = childrenMap[id] || [];
-    if (children.length === 0) return;
-    let cursor = centerX - subtreeWidth(id) / 2;
     for (const childId of children) {
-      const w = subtreeWidth(childId);
-      position(childId, cursor + w / 2, depth + 1);
-      cursor += w;
+      const childNode = byId[childId];
+      // Sidetracks shift right of their parent's column
+      const childOffset = childNode && childNode.kind === 'sidetrack'
+        ? sideOffset + SIDE_OFFSET
+        : sideOffset;
+      visit(childId, childOffset);
     }
   }
-
-  let rootCursor = 0;
-  for (const root of roots) {
-    const w = subtreeWidth(root.id);
-    position(root.id, rootCursor + w / 2, 0);
-    rootCursor += w + 80;
-  }
-
-  if (tree.nodes.length > 0) {
-    const minX = Math.min(...tree.nodes.map(n => n.x));
-    const maxX = Math.max(...tree.nodes.map(n => n.x));
-    const offset = (TARGET_W / 2) - (minX + maxX) / 2;
-    for (const n of tree.nodes) n.x += offset;
-  }
+  for (const root of roots) visit(root.id, 0);
 }
 
 // ============================================================

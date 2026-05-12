@@ -87,13 +87,12 @@ async function startDaemon() {
   daemon.on('exit', (code) => console.log('[toot] daemon exited:', code));
 }
 
-const SIZE_FULL = { w: 800, h: 560 };
-const SIZE_PILL = { w: 260, h: 96 };  // taller — was 80, gave the pill outline no breathing room
-const MARGIN_RIGHT = 380;
-const MARGIN_TOP = 8;
-// Per-view offsets from the host window's top-right corner
-const PILL_OFFSET = { right: 380, top: 8 };   // flush in the header strip
-const FULL_OFFSET = { right: 18,  top: 86 };  // below header, hangs into chat area
+// Pill stays at the same width in both views — only the height changes.
+// Anchored top-right of the screen, always.
+const SIZE_FULL = { w: 320, h: 720 };  // tall narrow column, grows downward
+const SIZE_PILL = { w: 320, h: 96 };
+const MARGIN_RIGHT = 18;
+const MARGIN_TOP = 12;
 
 let cachedHost = null;
 
@@ -175,34 +174,9 @@ function ensureAccessibility() {
 }
 
 app.whenReady().then(async () => {
-  ensureAccessibility();
   await startDaemon();
-  await refreshHost();
   createWindow();
-  startFollowingHost();
 });
-
-// Find the host window in the background once at startup. AppleScript via Electron's
-// sandboxed spawn is sluggish (10-25s cold), so we DON'T poll — we do one fire-and-forget
-// query and reposition when it resolves. If the user moves Claude later, ⌘R in the app
-// (or relaunch) re-anchors.
-function startFollowingHost() {
-  if (followTimer) clearInterval(followTimer);
-  // Single deferred query — runs in background, doesn't block app launch
-  setTimeout(async () => {
-    if (!win || win.isDestroyed()) return;
-    const host = await findHostWindow();
-    if (!host) {
-      console.log('[toot] No host found, staying anchored to screen.');
-      return;
-    }
-    cachedHost = host;
-    lastHostKey = `${host.x},${host.y},${host.width},${host.height}`;
-    const cur = win.getBounds();
-    const isMin = Math.abs(cur.width - SIZE_PILL.w) < 30;
-    smoothResize(isMin ? pillBounds() : fullBounds(), 400);
-  }, 100);
-}
 
 app.on('before-quit', () => {
   if (daemon && !daemon.killed) daemon.kill();
