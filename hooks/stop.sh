@@ -34,7 +34,8 @@ TRANSCRIPT_PATH=$(echo "$PARSED" | node -e 'let b="";process.stdin.on("data",c=>
 # Extract the most recent assistant message text and look for a <train-of-thought> tag
 LABEL=""
 if [ -n "$TRANSCRIPT_PATH" ] && [ -f "$TRANSCRIPT_PATH" ]; then
-  LABEL=$(node -e '
+  # Extract label and/or summary from the most recent assistant message
+  PARSED=$(node -e '
     (function() {
       const fs = require("fs");
       const path = process.argv[1];
@@ -52,20 +53,38 @@ if [ -n "$TRANSCRIPT_PATH" ] && [ -f "$TRANSCRIPT_PATH" ]; then
               if (part.type === "text" && part.text) text += part.text + "\n";
             }
           }
-          // Find label format. Check most-specific first.
-          // 1) Italic-first-line: response begins with *label* on its own line
-          // 2) HTML comment fallback: <!--toot:label-->
-          // 3) Legacy XML: <train-of-thought>label</train-of-thought>
-          const firstNonEmpty = text.split("\n").map(l => l.trim()).find(l => l.length > 0) || "";
-          let m = firstNonEmpty.match(/^\*([^*\n]{2,40})\*$/);
-          if (!m) m = text.match(/<!--\s*toot:\s*([^\n>]+?)\s*-->/i);
-          if (!m) m = text.match(/<train-of-thought>([\s\S]*?)<\/train-of-thought>/i);
-          if (m) { process.stdout.write(m[1].trim()); return; }
-          if (text.trim()) return; // bailed at first non-empty assistant message even without tag
+          if (!text.trim()) continue;
+          // Parse the first few non-empty lines for *label* and _summary_
+          const head = text.split("\n").map(l => l.trim()).filter(l => l.length > 0).slice(0, 6);
+          let label = "";
+          let summary = "";
+          for (const line of head) {
+            if (!label) {
+              const m = line.match(/^\*([^*\n]{2,40})\*$/);
+              if (m) { label = m[1].trim(); continue; }
+            }
+            if (!summary) {
+              const m = line.match(/^_([^_\n]{2,100})_$/);
+              if (m) { summary = m[1].trim(); continue; }
+            }
+            if (label && summary) break;
+          }
+          // Legacy formats also accepted for label
+          if (!label) {
+            let m = text.match(/<!--\s*toot:\s*([^\n>]+?)\s*-->/i)
+                 || text.match(/<train-of-thought>([\s\S]*?)<\/train-of-thought>/i);
+            if (m) label = m[1].trim();
+          }
+          process.stdout.write(JSON.stringify({ label, summary }));
+          return;
         }
-      } catch (e) {}
+        process.stdout.write("{}");
+      } catch (e) { process.stdout.write("{}"); }
     })();
   ' "$TRANSCRIPT_PATH")
+
+  LABEL=$(echo "$PARSED" | node -e 'let b="";process.stdin.on("data",c=>b+=c).on("end",()=>{try{const j=JSON.parse(b);process.stdout.write(j.label||"")}catch(e){}})')
+  SUMMARY=$(echo "$PARSED" | node -e 'let b="";process.stdin.on("data",c=>b+=c).on("end",()=>{try{const j=JSON.parse(b);process.stdout.write(j.summary||"")}catch(e){}})')
 fi
 
 # Send Stop event first (clears thinking state)
@@ -74,7 +93,7 @@ curl -s -m 1 -X POST http://127.0.0.1:3801/event \
   -H "Content-Type: application/json" -d "$STOP_PAYLOAD" >/dev/null 2>&1 &
 disown 2>/dev/null
 
-# If we extracted a label, send it as a label refinement
+# Send the label first (may create a branch on topic shift)
 if [ -n "$LABEL" ]; then
   PAYLOAD=$(node -e '
     process.stdout.write(JSON.stringify({
@@ -83,6 +102,19 @@ if [ -n "$LABEL" ]; then
       label: process.argv[2],
     }));
   ' "$SESSION_ID" "$LABEL")
+  curl -s -m 1 -X POST http://127.0.0.1:3801/event \
+    -H "Content-Type: application/json" -d "$PAYLOAD" >/dev/null 2>&1
+fi
+
+# Then add the per-turn summary as a sub-thought of the current pill
+if [ -n "$SUMMARY" ]; then
+  PAYLOAD=$(node -e '
+    process.stdout.write(JSON.stringify({
+      type: "add-subthought",
+      session_id: process.argv[1],
+      text: process.argv[2],
+    }));
+  ' "$SESSION_ID" "$SUMMARY")
   curl -s -m 1 -X POST http://127.0.0.1:3801/event \
     -H "Content-Type: application/json" -d "$PAYLOAD" >/dev/null 2>&1 &
   disown 2>/dev/null

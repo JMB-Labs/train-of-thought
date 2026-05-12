@@ -188,6 +188,14 @@ function handleEvent(event) {
   } else if (event.type === 'stop') {
     // Claude finished responding — clear thinking state
     state.thinkingNodeId = null;
+  } else if (event.type === 'add-subthought') {
+    const session = state.sessions[sessionId];
+    if (!session || !event.text) return;
+    const node = state.nodes.find(n => n.id === session.lastNodeId);
+    if (!node) return;
+    node.subthoughts = node.subthoughts || [];
+    const last = node.subthoughts[node.subthoughts.length - 1];
+    if (last !== event.text) node.subthoughts.push(event.text.trim().slice(0, 120));
   } else if (event.type === 'update-latest-label') {
     const session = state.sessions[sessionId];
     state.thinkingNodeId = null;

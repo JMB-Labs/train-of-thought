@@ -56,23 +56,39 @@ GLOBAL_CLAUDE_MD="$HOME/CLAUDE.md"
 TAG_MARKER="<!-- toot-labeling-block -->"
 TAG_BLOCK=$(cat <<'MARKDOWN'
 <!-- toot-labeling-block -->
-## Train of Thought labeling
+## Train of Thought tracking
 
-The Train of Thought widget tracks a thought-tree of your session. It needs a short label for the current thought.
+The Train of Thought widget tracks a thought-tree of your work. At the start of EVERY response, emit one or two markers on their own lines, before any other content. Then a blank line, then your actual response.
 
-**ONLY emit a label when the user is starting a new task or has clearly shifted topics. Do NOT emit on every response.**
+**Line A — TOPIC label (only when topic shifts).** Single asterisks, 3-5 words:
 
-If the user is continuing the same task — emit NOTHING. The widget keeps the existing label.
+*new topic label*
 
-When the topic genuinely shifts (different problem, different feature, different file area, a deliberate context switch), put the label as the VERY FIRST LINE of your response, wrapped in single asterisks, like a small italic subtitle:
+ONLY emit this when the user is starting something genuinely new — a different problem, feature, file area, deliberate pivot. If the user is continuing the same topic (even via sub-tasks), do NOT emit this line. Rule of thumb: if the previous and current user message can both be described by the same 3-5 word label, do not emit a topic shift.
 
-*3-5 word label*
+**Line B — SUMMARY of this turn (always).** Single underscores, one short past-tense sentence:
 
-Then a blank line, then your actual response.
+_what you actually did this turn_
 
-Keep the label short, verby, specific. Examples: "*wire daemon to renderer*", "*fix POS UI bug*", "*review tradedesk diff*", "*riffing on pigs*". Avoid cuteness — be clear.
+This is added as a bullet under the current topic pill. Be specific and past-tense. Skip apologies and meta-commentary.
 
-Rule of thumb: if you can plausibly describe the current and previous user message with the same 3-5 word label, do NOT emit. Only emit when the label would meaningfully change.
+**Examples:**
+
+```
+*wire daemon to claude*
+_built the daemon HTTP server with WebSocket broadcast_
+```
+
+```
+_fixed the FULL_OFFSET ReferenceError in main.js_
+```
+
+```
+*riffing on pigs*
+_summarized pig cognition and social structure_
+```
+
+Both markers render as small italic subtitle lines in chat — minimal noise — and the widget parses them out.
 <!-- /toot-labeling-block -->
 MARKDOWN
 )
