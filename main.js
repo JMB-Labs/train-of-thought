@@ -88,10 +88,12 @@ async function startDaemon() {
 }
 
 const SIZE_FULL = { w: 800, h: 560 };
-const SIZE_PILL = { w: 240, h: 80 };
-const MARGIN_RIGHT = 24;
-const MARGIN_TOP = 100;
-const HOST_ANCHOR_OFFSET = { right: 18, top: 86 };
+const SIZE_PILL = { w: 260, h: 96 };  // taller — was 80, gave the pill outline no breathing room
+const MARGIN_RIGHT = 380;
+const MARGIN_TOP = 12;
+// Per-view offsets from the host window's top-right corner
+const PILL_OFFSET = { right: 380, top: 12 };  // header strip, centered between project name & icons
+const FULL_OFFSET = { right: 18,  top: 86 };  // below header, hangs into chat area
 
 let cachedHost = null;
 
@@ -100,24 +102,26 @@ async function refreshHost() {
   return cachedHost;
 }
 
-function anchorBoundsFor(size) {
-  // If we have a host window, anchor top-right inside it; else fall back to screen.
+function anchorWithOffset(size, offset) {
   if (cachedHost) {
-    const x = cachedHost.x + cachedHost.width - size.w - HOST_ANCHOR_OFFSET.right;
-    const y = cachedHost.y + HOST_ANCHOR_OFFSET.top;
-    return { x, y, width: size.w, height: size.h };
+    return {
+      x: cachedHost.x + cachedHost.width - size.w - offset.right,
+      y: cachedHost.y + offset.top,
+      width: size.w,
+      height: size.h,
+    };
   }
   const { width: sw } = screen.getPrimaryDisplay().workAreaSize;
   return {
-    x: sw - size.w - MARGIN_RIGHT,
-    y: MARGIN_TOP,
+    x: sw - size.w - offset.right,
+    y: offset.top,
     width: size.w,
     height: size.h,
   };
 }
 
-function fullBounds() { return anchorBoundsFor(SIZE_FULL); }
-function pillBounds() { return anchorBoundsFor(SIZE_PILL); }
+function fullBounds() { return anchorWithOffset(SIZE_FULL, FULL_OFFSET); }
+function pillBounds() { return anchorWithOffset(SIZE_PILL, PILL_OFFSET); }
 
 function createWindow() {
   const b = fullBounds();
@@ -236,7 +240,8 @@ function smoothResize(target, duration = 500) {
 ipcMain.on('set-view', (_, view) => {
   if (!win) return;
   const target = view === 'minimized' ? pillBounds() : fullBounds();
-  smoothResize(target, 350);
+  // Instant snap — let CSS handle the visual motion. Removes the tween-induced lag.
+  win.setBounds(target);
 });
 
 ipcMain.on('quit', () => app.quit());
