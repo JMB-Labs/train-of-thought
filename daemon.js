@@ -195,9 +195,29 @@ function handleEvent(event) {
     const node = state.nodes.find(n => n.id === session.lastNodeId);
     if (!node) return;
     const next = event.label.trim().slice(0, 40);
-    // Skip if the label is unchanged — no churn, no re-magic-write
-    if (node.label === next) return;
-    node.label = next;
+    if (node.label === next) return;  // same label, no churn
+
+    if (!node.labelRefined) {
+      // First refinement: replace the word-trim label with Claude's smart one. Same node.
+      node.label = next;
+      node.labelRefined = true;
+    } else {
+      // Subsequent emit with a different label = TOPIC SHIFT. Branch into a new pill.
+      const newId = `p-${Date.now()}`;
+      state.nodes.push({
+        id: newId,
+        label: next,
+        kind: 'task',
+        parentId: node.id,
+        sessionId,
+        cwd: node.cwd,
+        timestamp: new Date().toISOString(),
+        labelRefined: true,
+      });
+      state.edges.push({ from: node.id, to: newId, sidetrack: false });
+      session.lastNodeId = newId;
+      state.currentId = newId;
+    }
   }
 
   save();
