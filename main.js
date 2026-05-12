@@ -87,10 +87,10 @@ async function startDaemon() {
   daemon.on('exit', (code) => console.log('[toot] daemon exited:', code));
 }
 
-// Pill stays at the same width in both views — only the height changes.
+// Min view is a proper compact pill; max view is a tall narrow column.
 // Anchored top-right of the screen, always.
-const SIZE_FULL = { w: 320, h: 720 };  // tall narrow column, grows downward
-const SIZE_PILL = { w: 320, h: 96 };
+const SIZE_FULL = { w: 360, h: 680 };  // tall narrow column, grows downward
+const SIZE_PILL = { w: 240, h: 72 };   // proper small pill
 const MARGIN_RIGHT = 18;
 const MARGIN_TOP = 12;
 
