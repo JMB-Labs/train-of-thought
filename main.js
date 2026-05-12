@@ -94,33 +94,18 @@ const SIZE_PILL = { w: 320, h: 96 };
 const MARGIN_RIGHT = 18;
 const MARGIN_TOP = 12;
 
-let cachedHost = null;
-
-async function refreshHost() {
-  cachedHost = await findHostWindow();
-  return cachedHost;
-}
-
-function anchorWithOffset(size, offset) {
-  if (cachedHost) {
-    return {
-      x: cachedHost.x + cachedHost.width - size.w - offset.right,
-      y: cachedHost.y + offset.top,
-      width: size.w,
-      height: size.h,
-    };
-  }
+function anchorBoundsFor(size) {
   const { width: sw } = screen.getPrimaryDisplay().workAreaSize;
   return {
-    x: sw - size.w - offset.right,
-    y: offset.top,
+    x: sw - size.w - MARGIN_RIGHT,
+    y: MARGIN_TOP,
     width: size.w,
     height: size.h,
   };
 }
 
-function fullBounds() { return anchorWithOffset(SIZE_FULL, FULL_OFFSET); }
-function pillBounds() { return anchorWithOffset(SIZE_PILL, PILL_OFFSET); }
+function fullBounds() { return anchorBoundsFor(SIZE_FULL); }
+function pillBounds() { return anchorBoundsFor(SIZE_PILL); }
 
 function createWindow() {
   const b = fullBounds();
