@@ -58,11 +58,19 @@ TAG_BLOCK=$(cat <<'MARKDOWN'
 <!-- toot-labeling-block -->
 ## Train of Thought labeling
 
-The Train of Thought widget is installed on this system. At the very start of EVERY response, on its own line BEFORE any other text, emit this HTML comment:
+The Train of Thought widget is installed. It tracks a thought-tree across your session.
+
+**ONLY emit this HTML comment when the user is starting a new task or has clearly shifted topics. Do NOT emit it on every response.**
+
+If the user is continuing the same task, the same conversation, the same idea — emit NOTHING. The widget keeps the existing label.
+
+When the topic genuinely shifts (different problem, different feature, different file area, a deliberate context switch), emit on the very first line, before any other text:
 
 <!--toot:3-5 word label-->
 
-The comment renders invisibly in chat but my widget parses it as the label for the current thought. Keep it short, verby, specific. Examples: "wire daemon to renderer", "fix POS UI bug", "rebuild auth flow", "riffing on pigs". Avoid cuteness — be clear.
+Keep the label short, verby, specific. Examples: "wire daemon to renderer", "fix POS UI bug", "review tradedesk diff", "riffing on pigs". Avoid cuteness — be clear.
+
+Rule of thumb: if you can plausibly describe the current and previous user message with the same 3-5 word label, do NOT emit. Only emit when the label would meaningfully change.
 <!-- /toot-labeling-block -->
 MARKDOWN
 )

@@ -189,13 +189,15 @@ function handleEvent(event) {
     // Claude finished responding — clear thinking state
     state.thinkingNodeId = null;
   } else if (event.type === 'update-latest-label') {
-    // Stop hook extracted a <train-of-thought> tag — refine the label
     const session = state.sessions[sessionId];
-    if (session && event.label) {
-      const node = state.nodes.find(n => n.id === session.lastNodeId);
-      if (node) node.label = event.label.trim().slice(0, 40);
-    }
     state.thinkingNodeId = null;
+    if (!session || !event.label) return;
+    const node = state.nodes.find(n => n.id === session.lastNodeId);
+    if (!node) return;
+    const next = event.label.trim().slice(0, 40);
+    // Skip if the label is unchanged — no churn, no re-magic-write
+    if (node.label === next) return;
+    node.label = next;
   }
 
   save();
