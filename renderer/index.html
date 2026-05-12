@@ -77,6 +77,18 @@ html, body {
     background    0.35s var(--easing);
 }
 
+/* In min view ONLY: shell is fully transparent — pill IS the entire window */
+#app[data-view="minimized"] .shell {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+/* In min view ONLY: pill (current node) fills the shell area exactly so there's no gap */
+#app[data-view="minimized"] .node {
+  min-width: 248px;
+  min-height: 84px;
+}
+
 #app[data-view="minimized"] .shell {
   border-radius: 100px;
 }
