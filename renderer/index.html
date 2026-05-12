@@ -768,7 +768,7 @@ function addNodeEl(node, opts = {}) {
   return el;
 }
 
-// Every non-session node gets parent caps + name layout
+// Every non-session node gets parent caps + name layout, plus subthought bullets when current.
 function fillNodeHTML(el, node) {
   let html = '';
   if (node.kind === 'session') {
@@ -782,6 +782,12 @@ function fillNodeHTML(el, node) {
     html += `<span class="node-now">${escapeHtml(node.label)}</span>`;
   }
   if (node.badge) html += `<span class="badge">${escapeHtml(node.badge)}</span>`;
+  // Subthoughts — always rendered; CSS hides them unless .node.current
+  if (Array.isArray(node.subthoughts) && node.subthoughts.length > 0) {
+    html += '<ul class="node-subthoughts">';
+    for (const s of node.subthoughts) html += `<li>${escapeHtml(s)}</li>`;
+    html += '</ul>';
+  }
   el.innerHTML = html;
 }
 
