@@ -35,29 +35,31 @@ TRANSCRIPT_PATH=$(echo "$PARSED" | node -e 'let b="";process.stdin.on("data",c=>
 LABEL=""
 if [ -n "$TRANSCRIPT_PATH" ] && [ -f "$TRANSCRIPT_PATH" ]; then
   LABEL=$(node -e '
-    const fs = require("fs");
-    const path = process.argv[1];
-    try {
-      const lines = fs.readFileSync(path, "utf8").trim().split("\n");
-      for (let i = lines.length - 1; i >= 0; i--) {
-        let j;
-        try { j = JSON.parse(lines[i]); } catch (e) { continue; }
-        if (j.type !== "assistant" && j.role !== "assistant" && j.message?.role !== "assistant") continue;
-        let text = "";
-        const content = j.message?.content || j.content || "";
-        if (typeof content === "string") text = content;
-        else if (Array.isArray(content)) {
-          for (const part of content) {
-            if (part.type === "text" && part.text) text += part.text + "\n";
+    (function() {
+      const fs = require("fs");
+      const path = process.argv[1];
+      try {
+        const lines = fs.readFileSync(path, "utf8").trim().split("\n");
+        for (let i = lines.length - 1; i >= 0; i--) {
+          let j;
+          try { j = JSON.parse(lines[i]); } catch (e) { continue; }
+          if (j.type !== "assistant" && j.role !== "assistant" && j.message?.role !== "assistant") continue;
+          let text = "";
+          const content = j.message?.content || j.content || "";
+          if (typeof content === "string") text = content;
+          else if (Array.isArray(content)) {
+            for (const part of content) {
+              if (part.type === "text" && part.text) text += part.text + "\n";
+            }
           }
+          // Accept HTML-comment form OR legacy XML tag
+          let m = text.match(/<!--\s*toot:\s*([^\n>]+?)\s*-->/i);
+          if (!m) m = text.match(/<train-of-thought>([\s\S]*?)<\/train-of-thought>/i);
+          if (m) { process.stdout.write(m[1].trim()); return; }
+          if (text.trim()) return; // bailed at first non-empty assistant message even without tag
         }
-        // Accept either the HTML-comment form (invisible in chat) or the legacy XML tag
-        let m = text.match(/<!--\s*toot:\s*([^\n>]+?)\s*-->/i);
-        if (!m) m = text.match(/<train-of-thought>([\s\S]*?)<\/train-of-thought>/i);
-        if (m) { process.stdout.write(m[1].trim()); return; }
-        if (text) return; // stop at first assistant message even without tag
-      }
-    } catch (e) {}
+      } catch (e) {}
+    })();
   ' "$TRANSCRIPT_PATH")
 fi
 
