@@ -130,9 +130,8 @@ html, body {
   max-width: 100%;
 }
 
-#app[data-view="minimized"] .shell {
-  border-radius: 100px;
-}
+/* Min view shell uses the SAME shape as max view — rounded rectangle (box), not capsule */
+/* (border-radius stays at 26px from the base .shell rule) */
 
 /* ============================================================
    DRAG · top edge only in max view
@@ -808,7 +807,7 @@ function applyDaemonState(daemonState) {
   if (!daemonState || !Array.isArray(daemonState.nodes) || daemonState.nodes.length === 0) {
     return; // keep mock tree on empty daemon state
   }
-  // Detect new nodes that should magic-write
+  // Detect structural change (nodes added/removed/relabeled or edges changed)
   const previousIds = new Set(tree.nodes.map(n => n.id));
   const previousLabels = Object.fromEntries(tree.nodes.map(n => [n.id, n.label]));
   const newIds = new Set();
@@ -820,22 +819,31 @@ function applyDaemonState(daemonState) {
       relabeledIds.add(n.id);
     }
   }
+  const sameNodeSet = previousIds.size === daemonState.nodes.length
+    && [...previousIds].every(id => daemonState.nodes.some(n => n.id === id));
+  const sameEdges = tree.edges.length === daemonState.edges.length
+    && tree.edges.every((e, i) => e.from === daemonState.edges[i]?.from && e.to === daemonState.edges[i]?.to);
+  const structuralChange = !sameNodeSet || !sameEdges || newIds.size > 0 || relabeledIds.size > 0;
 
+  // Always sync state
   tree.nodes = daemonState.nodes.map(n => ({ ...n }));
   tree.edges = daemonState.edges.map(e => ({ ...e }));
   if (daemonState.currentId) state.currentId = daemonState.currentId;
   state.thinkingNodeId = daemonState.thinkingNodeId || null;
 
-  layoutTree();
-
-  // Rebuild nodeById
-  for (const k of Object.keys(nodeById)) delete nodeById[k];
-  Object.assign(nodeById, Object.fromEntries(tree.nodes.map(n => [n.id, n])));
-
-  renderEdges();
-  // Magic-write new nodes AND relabeled ones (Claude's <train-of-thought> refinement)
-  const magicIds = new Set([...newIds, ...relabeledIds]);
-  renderNodes({ magicIds });
+  if (structuralChange) {
+    layoutTree();
+    for (const k of Object.keys(nodeById)) delete nodeById[k];
+    Object.assign(nodeById, Object.fromEntries(tree.nodes.map(n => [n.id, n])));
+    renderEdges();
+    const magicIds = new Set([...newIds, ...relabeledIds]);
+    renderNodes({ magicIds });
+  } else {
+    // Just currentId or thinkingId changed — toggle classes only, no DOM rebuild
+    document.querySelectorAll('.node').forEach(el => {
+      el.classList.toggle('current', el.dataset.id === state.currentId);
+    });
+  }
   updateThinkingClass();
   updatePill();
   applyTransform();
