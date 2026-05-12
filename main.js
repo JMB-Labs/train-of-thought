@@ -107,6 +107,12 @@ function anchorBoundsFor(size) {
 function fullBounds() { return anchorBoundsFor(SIZE_FULL); }
 function pillBounds() { return anchorBoundsFor(SIZE_PILL); }
 
+// Track whether the user has manually moved the window.
+// If yes, min↔max preserves the user's position instead of snapping back to top-right.
+let userMoved = false;
+let userPos = null;
+let lastProgrammaticBounds = null;
+
 function createWindow() {
   const b = fullBounds();
 
@@ -132,6 +138,18 @@ function createWindow() {
   win.setWindowButtonVisibility?.(false);
   win.loadFile('renderer/index.html');
   win.setAlwaysOnTop(true, 'floating');
+
+  // Detect user drag (vs. our own programmatic resizes via smoothResize)
+  win.on('moved', () => {
+    if (!win || win.isDestroyed()) return;
+    const cur = win.getBounds();
+    const tracked = lastProgrammaticBounds;
+    if (!tracked) return;
+    if (Math.abs(cur.x - tracked.x) > 3 || Math.abs(cur.y - tracked.y) > 3) {
+      userMoved = true;
+      userPos = { x: cur.x, y: cur.y };
+    }
+  });
 }
 
 // macOS Accessibility — call with `true` to trigger the system permission prompt if not granted.
@@ -185,12 +203,14 @@ function smoothResize(target, duration = 500) {
     const elapsed = Date.now() - startTime;
     const t = Math.min(elapsed / duration, 1);
     const e = easeOutCubic(t);
-    win.setBounds({
+    const intermediate = {
       x: Math.round(start.x + (target.x - start.x) * e),
       y: Math.round(start.y + (target.y - start.y) * e),
       width: Math.round(start.width + (target.width - start.width) * e),
       height: Math.round(start.height + (target.height - start.height) * e),
-    });
+    };
+    win.setBounds(intermediate);
+    lastProgrammaticBounds = intermediate;  // so 'moved' can tell user drag from this
     if (t < 1) setTimeout(tick, 16);
   }
   tick();
@@ -198,8 +218,15 @@ function smoothResize(target, duration = 500) {
 
 ipcMain.on('set-view', (_, view) => {
   if (!win) return;
-  const target = view === 'minimized' ? pillBounds() : fullBounds();
-  // Smooth tween synced with CSS for a clean min↔max animation
+  const size = view === 'minimized' ? SIZE_PILL : SIZE_FULL;
+  // If the user has dragged the window, preserve their position and only change the size.
+  // Otherwise snap to the default top-right anchor.
+  let target;
+  if (userMoved && userPos) {
+    target = { x: userPos.x, y: userPos.y, width: size.w, height: size.h };
+  } else {
+    target = view === 'minimized' ? pillBounds() : fullBounds();
+  }
   smoothResize(target, 550);
 });
 

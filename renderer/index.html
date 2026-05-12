@@ -138,12 +138,16 @@ html, body {
 .drag-handle {
   position: absolute;
   top: 0; left: 0; right: 0;
-  height: 28px;
+  height: 32px;
   -webkit-app-region: drag;
   z-index: 1;
 }
 
-#app[data-view="minimized"] .drag-handle { display: none; }
+/* Min view: drag-handle stays available at top, pill-overlay covers everything BELOW it */
+#app[data-view="minimized"] .drag-handle {
+  display: block;
+  height: 32px;
+}
 
 button, .ctrl, .pill-overlay, .node {
   -webkit-app-region: no-drag;
@@ -154,7 +158,10 @@ button, .ctrl, .pill-overlay, .node {
    ============================================================ */
 .pill-overlay {
   position: absolute;
-  inset: 0;
+  top: 32px;        /* leave the top 32px clear for drag-handle */
+  left: 0;
+  right: 0;
+  bottom: 0;
   z-index: 15;
   cursor: pointer;
   display: none;
