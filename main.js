@@ -199,8 +199,8 @@ function smoothResize(target, duration = 500) {
 ipcMain.on('set-view', (_, view) => {
   if (!win) return;
   const target = view === 'minimized' ? pillBounds() : fullBounds();
-  // Instant snap — let CSS handle the visual motion. Removes the tween-induced lag.
-  win.setBounds(target);
+  // Smooth tween synced with CSS for a clean min↔max animation
+  smoothResize(target, 550);
 });
 
 ipcMain.on('quit', () => app.quit());
