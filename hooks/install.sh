@@ -58,11 +58,11 @@ TAG_BLOCK=$(cat <<'MARKDOWN'
 <!-- toot-labeling-block -->
 ## Train of Thought labeling
 
-The Train of Thought widget is installed on this system. At the start of EVERY response, on its own line, emit this tag:
+The Train of Thought widget is installed on this system. At the very start of EVERY response, on its own line BEFORE any other text, emit this HTML comment:
 
-<train-of-thought>3-5 word label describing what you're working on</train-of-thought>
+<!--toot:3-5 word label-->
 
-Keep it short, verby, specific. Examples: "wire daemon to renderer", "fix POS UI bug", "rebuild auth flow". Don't be cute — be clear.
+The comment renders invisibly in chat but my widget parses it as the label for the current thought. Keep it short, verby, specific. Examples: "wire daemon to renderer", "fix POS UI bug", "rebuild auth flow", "riffing on pigs". Avoid cuteness — be clear.
 <!-- /toot-labeling-block -->
 MARKDOWN
 )

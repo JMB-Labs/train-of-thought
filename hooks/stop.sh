@@ -51,7 +51,9 @@ if [ -n "$TRANSCRIPT_PATH" ] && [ -f "$TRANSCRIPT_PATH" ]; then
             if (part.type === "text" && part.text) text += part.text + "\n";
           }
         }
-        const m = text.match(/<train-of-thought>([\s\S]*?)<\/train-of-thought>/i);
+        // Accept either the HTML-comment form (invisible in chat) or the legacy XML tag
+        let m = text.match(/<!--\s*toot:\s*([^\n>]+?)\s*-->/i);
+        if (!m) m = text.match(/<train-of-thought>([\s\S]*?)<\/train-of-thought>/i);
         if (m) { process.stdout.write(m[1].trim()); return; }
         if (text) return; // stop at first assistant message even without tag
       }
