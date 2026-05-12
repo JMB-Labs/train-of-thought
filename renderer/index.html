@@ -94,8 +94,9 @@ html, body {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  align-items: flex-start;
-  padding: 0 26px;
+  align-items: center;
+  text-align: center;
+  padding: 0 22px;
   gap: 4px;
   opacity: 0;
   pointer-events: none;
@@ -203,8 +204,9 @@ button, .ctrl, .pill-overlay, .node {
   border-radius: 100px;
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
+  align-items: center;
   justify-content: center;
+  text-align: center;
   padding: 0 22px;
   gap: 2px;
   min-width: 220px;
@@ -668,7 +670,7 @@ function setView(view) {
   state.view = view;
   document.getElementById('app').dataset.view = view;
   // Synced transition matching the window resize tween
-  document.getElementById('stage').style.transition = 'transform 0.35s var(--easing)';
+  document.getElementById('stage').style.transition = 'transform 0.55s var(--easing)';
   if (window.toot) window.toot.setView(view);
   applyTransform();
 }
@@ -902,18 +904,28 @@ function updatePill() {
   if (pillNow)    pillNow.textContent = node.label;
 }
 
-// Vertical single-column layout — all nodes stack top-to-bottom in DFS order.
+// Vertical single-column layout — uses the VISIBLE tree (sessions hidden).
 // Sidetracks get a small x-offset so the connecting line shows the branch visually.
+// Focused pill gets extra height to make room for its subthought bullets.
 function layoutTree() {
   const TOP_Y = 56;
   const ROW_H = 92;
   const CENTER_X = TARGET_W / 2;
   const SIDE_OFFSET = 24;
-  const byId = Object.fromEntries(tree.nodes.map(n => [n.id, n]));
+  const SUBTHOUGHT_H = 18;
+
+  const visible = getVisibleTree();
+  const byId = Object.fromEntries(visible.nodes.map(n => [n.id, n]));
   const childrenMap = {};
-  for (const e of tree.edges) (childrenMap[e.from] = childrenMap[e.from] || []).push(e.to);
-  const hasParent = new Set(tree.edges.map(e => e.to));
-  const roots = tree.nodes.filter(n => !hasParent.has(n.id));
+  for (const e of visible.edges) (childrenMap[e.from] = childrenMap[e.from] || []).push(e.to);
+  const hasParent = new Set(visible.edges.map(e => e.to));
+  const roots = visible.nodes.filter(n => !hasParent.has(n.id));
+
+  function extraHeight(node) {
+    if (node.id !== state.currentId) return 0;
+    const subs = node.subthoughts || [];
+    return subs.length > 0 ? (subs.length * SUBTHOUGHT_H + 12) : 0;
+  }
 
   let yCursor = TOP_Y;
   function visit(id, sideOffset) {
@@ -921,11 +933,10 @@ function layoutTree() {
     if (!node) return;
     node.x = CENTER_X + sideOffset;
     node.y = yCursor;
-    yCursor += ROW_H;
+    yCursor += ROW_H + extraHeight(node);
     const children = childrenMap[id] || [];
     for (const childId of children) {
       const childNode = byId[childId];
-      // Sidetracks shift right of their parent's column
       const childOffset = childNode && childNode.kind === 'sidetrack'
         ? sideOffset + SIDE_OFFSET
         : sideOffset;
@@ -1205,18 +1216,23 @@ function toggleProjectFilter() {
   applyTransform();
 }
 
-// Filter helper — visible nodes/edges respect state.projectFilter
+// Filter helper — hides session-root nodes (they're logical anchors only) and respects project filter
 function getVisibleTree() {
-  if (!state.projectFilter) return tree;
+  // Always strip session-kind nodes from the visible tree
+  const baseNodes = tree.nodes.filter(n => n.kind !== 'session');
+  const baseEdges = tree.edges.filter(e => {
+    const from = tree.nodes.find(n => n.id === e.from);
+    return from && from.kind !== 'session';
+  });
+  if (!state.projectFilter) return { nodes: baseNodes, edges: baseEdges };
   const matchIds = new Set();
-  for (const n of tree.nodes) {
-    if (n.cwd === state.projectFilter || n.kind === 'session') matchIds.add(n.id);
+  for (const n of baseNodes) {
+    if (n.cwd === state.projectFilter) matchIds.add(n.id);
   }
-  // Pull in ancestors so the tree connects
   let changed = true;
   while (changed) {
     changed = false;
-    for (const e of tree.edges) {
+    for (const e of baseEdges) {
       if (matchIds.has(e.to) && !matchIds.has(e.from)) {
         matchIds.add(e.from);
         changed = true;
@@ -1224,8 +1240,8 @@ function getVisibleTree() {
     }
   }
   return {
-    nodes: tree.nodes.filter(n => matchIds.has(n.id)),
-    edges: tree.edges.filter(e => matchIds.has(e.from) && matchIds.has(e.to)),
+    nodes: baseNodes.filter(n => matchIds.has(n.id)),
+    edges: baseEdges.filter(e => matchIds.has(e.from) && matchIds.has(e.to)),
   };
 }
 

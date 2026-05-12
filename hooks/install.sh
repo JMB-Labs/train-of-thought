@@ -60,11 +60,13 @@ TAG_BLOCK=$(cat <<'MARKDOWN'
 
 The Train of Thought widget tracks a thought-tree of your work. At the start of EVERY response, emit one or two markers on their own lines, before any other content. Then a blank line, then your actual response.
 
-**Line A — TOPIC label (only when topic shifts).** Single asterisks, 3-5 words:
+**Line A — TOPIC label (only when topic shifts).** Single asterisks, 3-5 words, verby and specific:
 
 *new topic label*
 
 ONLY emit this when the user is starting something genuinely new — a different problem, feature, file area, deliberate pivot. If the user is continuing the same topic (even via sub-tasks), do NOT emit this line. Rule of thumb: if the previous and current user message can both be described by the same 3-5 word label, do not emit a topic shift.
+
+The label should describe the ACTION or topic with verbs and specifics, not vague gerunds. Bad: "*about pigs*", "*pigs*", "*coding*". Good: "*riffing on pig cognition*", "*reading wiki on pigs*", "*pig facts dump*", "*wiring daemon to renderer*".
 
 **Line B — SUMMARY of this turn (always).** Single underscores, one short past-tense sentence:
 
