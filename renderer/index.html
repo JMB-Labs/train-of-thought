@@ -77,16 +77,57 @@ html, body {
     background    0.35s var(--easing);
 }
 
-/* In min view ONLY: shell is fully transparent — pill IS the entire window */
-#app[data-view="minimized"] .shell {
-  background: transparent !important;
-  box-shadow: none !important;
+/* MIN VIEW: hide the tree canvas, show pill-content (the text directly inside the shell) */
+#app[data-view="minimized"] .canvas {
+  opacity: 0;
+  pointer-events: none;
 }
 
-/* In min view ONLY: pill (current node) fills the shell area exactly so there's no gap */
-#app[data-view="minimized"] .node {
-  min-width: 248px;
-  min-height: 84px;
+#app[data-view="minimized"] .pill-content {
+  opacity: 1;
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+/* Pill content layout — direct text inside the shell, no inner pill box */
+.pill-content {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 0 26px;
+  gap: 4px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s var(--easing);
+  z-index: 5;
+}
+
+.pill-content .pill-parent {
+  font-family: 'Inter', sans-serif;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.pill-content .pill-now {
+  font-family: 'Source Serif 4', serif;
+  font-size: 15px;
+  color: var(--text);
+  letter-spacing: -0.005em;
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
 }
 
 #app[data-view="minimized"] .shell {
@@ -490,7 +531,13 @@ button, .ctrl, .pill-overlay, .node {
       </div>
     </div>
 
-    <!-- INVISIBLE CLICK-CATCHER in min view to expand -->
+    <!-- MIN VIEW content: text directly inside the shell (no inner pill box) -->
+    <div class="pill-content" id="pill-content">
+      <span class="pill-parent" id="pill-parent">AIBOS · TTS skill</span>
+      <span class="pill-now" id="pill-now">Test bm_fable voice</span>
+    </div>
+
+    <!-- Click-catcher for expand (sits on top of pill-content in min view) -->
     <div class="pill-overlay" id="pill-overlay" title="Click to expand"></div>
 
     <!-- CONTROLS -->
@@ -800,6 +847,17 @@ function updateThinkingClass() {
   });
 }
 
+function updatePill() {
+  const node = nodeById[state.currentId];
+  if (!node) return;
+  const parents = findParents(node.id);
+  const parentTrail = parents.length ? parents[0].label : (node.cwd ? node.cwd.split('/').pop() : '—');
+  const pillParent = document.getElementById('pill-parent');
+  const pillNow    = document.getElementById('pill-now');
+  if (pillParent) pillParent.textContent = parentTrail;
+  if (pillNow)    pillNow.textContent = node.label;
+}
+
 // Top-down auto-layout for daemon-supplied nodes (which don't have x/y)
 function layoutTree() {
   const LEVEL_H = 130;
@@ -1000,6 +1058,7 @@ function init() {
   applyTheme();
   renderEdges();
   renderNodes();
+  updatePill();
   applyTransform();
 
   document.getElementById('pill-overlay').addEventListener('click', () => setView('focused'));
