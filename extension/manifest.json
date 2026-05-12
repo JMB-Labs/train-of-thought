@@ -1,0 +1,19 @@
+{
+  "manifest_version": 3,
+  "name": "Train of Thought · claude.ai bridge",
+  "version": "0.1.0",
+  "description": "Bridges claude.ai web chats and Cowork to the Train of Thought widget running on your machine.",
+  "host_permissions": [
+    "https://claude.ai/*",
+    "http://127.0.0.1:3801/*",
+    "http://localhost:3801/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["https://claude.ai/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle",
+      "all_frames": false
+    }
+  ]
+}
