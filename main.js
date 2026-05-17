@@ -1,4 +1,5 @@
 const { app, BrowserWindow, screen, ipcMain, systemPreferences, dialog, shell } = require('electron');
+app.setName('Thought Tree v1');
 const { spawn, exec } = require('child_process');
 const http = require('http');
 const path = require('path');
@@ -127,7 +128,7 @@ function createWindow() {
     alwaysOnTop: true,
     resizable: false,
     backgroundColor: '#00000000',
-    title: 'Train of Thought',
+    title: 'Thought Tree v1',
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,

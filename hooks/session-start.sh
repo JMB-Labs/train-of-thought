@@ -9,18 +9,8 @@ CWD=$(echo "$INPUT" | sed -n 's/.*"cwd"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1
 [ -z "$CWD" ] && CWD="$PWD"
 [ -z "$SESSION_ID" ] && SESSION_ID="local-$$"
 
-# If the daemon isn't responding, the widget probably isn't running — launch it.
-if ! curl -sS -m 1 http://127.0.0.1:3801/health >/dev/null 2>&1; then
-  TOOT_DIR="$HOME/Projects/train-of-thought"
-  if [ -d "$TOOT_DIR" ]; then
-    (cd "$TOOT_DIR" && nohup npm start >/tmp/toot-launch.log 2>&1 &) >/dev/null 2>&1
-    # Give the daemon a moment to come up before sending the event
-    for i in 1 2 3 4 5 6 7 8 9 10; do
-      curl -sS -m 1 http://127.0.0.1:3801/health >/dev/null 2>&1 && break
-      sleep 0.3
-    done
-  fi
-fi
+# Fire-and-forget — if the Thought Tree v1 app isn't running, the event is just lost.
+# Sir opens the app manually from Spotlight / Dock when he wants tracking.
 
 PAYLOAD=$(printf '{"type":"session-start","session_id":"%s","cwd":"%s"}' "$SESSION_ID" "$CWD")
 curl -s -m 1 -X POST http://127.0.0.1:3801/event \
